@@ -6,7 +6,7 @@ using System.Net.Sockets;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace DeltaProxy
+namespace DeltaProxy.modules
 {
     /// <summary>
     /// This module keeps track of connections: it stores current connection info (nickname, username, IP, VHost), as well as keeps track of when last connection with the same nickname+username pair occured.
@@ -35,6 +35,7 @@ namespace DeltaProxy
             var msgSplit = msg.SplitMessage();
             if (msgSplit.Assert("NICK", 0) && msgSplit.AssertCount(2)) // Expects NICK command from user
             {
+                if (info.Nickname is not null) info.ChangedNickname = true;
                 info.Nickname = msgSplit[1];
             }
             if (info.Username is null && msgSplit.Assert("USER", 0) && msgSplit.AssertCount(2, true)) // Expects USER command from user, but only once
@@ -103,28 +104,34 @@ namespace DeltaProxy
 
             public TcpClient Client;
             public StreamWriter Writer;
-            public StreamReader Reader;
             public Stream Stream;
+
+            public StreamWriter ServerWriter;
 
             public long ConnectionTimestamp;
             public long LastMessage;
 
             private StoredConnection _cached;
 
+            public bool ChangedNickname = false;
+
             public StoredConnection stored
             {
                 get
                 {
                     if (_cached is not null) return _cached;
-                    var val = db.userConnections.LastOrDefault((z) => z.Nickname == Nickname && z.Username == Username);
-                    if (val is not null) _cached = val;
-                    return val;
+                    lock (db.userConnections)
+                    {
+                        var val = db.userConnections.LastOrDefault((z) => z.Nickname == Nickname && z.Username == Username);
+                        if (val is not null) _cached = val;
+                        return val;
+                    }
                 }
                 set
                 {
                     _cached = null;
-                    db.userConnections.Add(value);
-                    db.SaveDatabase("conninfo_db.json");
+                    lock (db.userConnections) db.userConnections.Add(value);
+                    db.SaveDatabase();
                 }
             }
         }

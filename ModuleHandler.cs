@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using static DeltaProxy.ConnectionInfoHolderModule;
+using static DeltaProxy.modules.ConnectionInfoHolderModule;
 
 namespace DeltaProxy
 {
@@ -18,7 +18,8 @@ namespace DeltaProxy
         public static void ProcessServerMessage(ConnectionInfo info, string msg)
         {
             ConnectionInfoHolderModule.ResolveServerMessage(info, msg);
-            AdvertisementModule.ResolveServerMessage(info, msg);
+            if (AdvertisementModule.cfg.isEnabled) AdvertisementModule.ResolveServerMessage(info, msg);
+            if (WordBlacklistModule.cfg.isEnabled) WordBlacklistModule.ResolveServerMessage(info, msg);
         }
 
         /// <summary>
@@ -32,7 +33,10 @@ namespace DeltaProxy
             bool result = true;
 
             result &= ConnectionInfoHolderModule.ResolveClientMessage(info, msg);
+            result &= BansModule.cfg.isEnabled ? BansModule.ResolveClientMessage(info, msg) : true;
             result &= FirstConnectionKillModule.cfg.isEnabled ? FirstConnectionKillModule.ResolveClientMessage(info, msg) : true;
+            result &= WordBlacklistModule.cfg.isEnabled ? WordBlacklistModule.ResolveClientMessage(info, msg) : true;
+            result &= StaffAuthModule.ResolveClientMessage(info, msg);
 
             return result;
         }

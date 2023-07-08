@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Data.SqlTypes;
 using System.Linq;
+using System.Reflection.Metadata.Ecma335;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -46,6 +47,43 @@ namespace DeltaProxy
         {
             sw.WriteLine($":{Program.cfg.serverHostname} {message}");
         }
+
+        public static void SendServerMessage(this StreamWriter sw, string sender, string receiver, string message)
+        {
+            sw.WriteLine($":{sender}!proxy@{Program.cfg.serverHostname} NOTICE {receiver} :{message}");
+        }
+
+        public static string ToDuration(this long? span)
+        {
+            if (span < 0 || span is null) return "(forever)";
+
+            var t = TimeSpan.FromSeconds((double)span);
+            
+            if (t.TotalSeconds < 1)
+            {
+                return $@"less than a second";
+            }
+            if (t.TotalMinutes < 1)
+            {
+                return $@"{t:%s} second{(t.Seconds != 1 ? "s" : "")}";
+            }
+            if (t.TotalHours < 1)
+            {
+                return $@"{t:%m} minute{(t.Minutes != 1 ? "s" : "")} and {t:%s} second{(t.Seconds != 1 ? "s" : "")}";
+            }
+            if (t.TotalDays < 1)
+            {
+                return $@"{t:%h} hour{(t.Hours != 1 ? "s" : "")} and {t:%m} minute{(t.Minutes != 1 ? "s" : "")}";
+            }
+            if (t.TotalDays < 31)
+            {
+                return $@"{t:%d} day{(t.Days != 1 ? "s" : "")} and {t:%h} hour{(t.Hours != 1 ? "s" : "")}";
+            }
+
+            return $@"{t:%d} days";
+        }
+
+        public static string ToDuration(this int? span) => ToDuration((long?)span);
 
         public static long Unix()
         {

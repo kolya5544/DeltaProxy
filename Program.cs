@@ -3,7 +3,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Security.Cryptography.X509Certificates;
 using System.Net.Security;
-using static DeltaProxy.ConnectionInfoHolderModule;
+using static DeltaProxy.modules.ConnectionInfoHolderModule;
 
 namespace DeltaProxy
 {
@@ -38,6 +38,8 @@ namespace DeltaProxy
 
             var server = new TcpListener(IPAddress.Parse(cfg.localIP), isSSL ? cfg.localPort : cfg.portPlaintext);
             server.Start();
+
+            Log($"Successfully initialized a TCP server (SSL = {isSSL})");
 
             new Thread(() =>
             {
@@ -124,8 +126,8 @@ namespace DeltaProxy
 
                 info.Client = client;
                 info.Writer = client_sw;
-                info.Reader = client_sr;
                 info.Stream = client_stream;
+                info.ServerWriter = server_sw;
 
                 // and now we forward user -> server, indefinitely.
                 new Thread(() =>
@@ -144,6 +146,7 @@ namespace DeltaProxy
                         }
                     } catch (Exception ex)
                     {
+                        Log($"{ex.Message} {ex.StackTrace}");
                         clientException = ex;
                     }
                 }).Start();
@@ -169,7 +172,7 @@ namespace DeltaProxy
                 }
             } catch (Exception ex)
             {
-                Console.WriteLine($"{ex.Message} {ex.StackTrace}");
+                Log($"{ex.Message} {ex.StackTrace}");
             } finally
             {
                 client_stream.Close();

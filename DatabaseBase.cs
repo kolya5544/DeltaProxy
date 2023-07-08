@@ -9,25 +9,33 @@ namespace DeltaProxy
 {
     public abstract class DatabaseBase<T> where T : DatabaseBase<T>, new()
     {
+        private string filename;
+
         public static T LoadDatabase(string filepath)
         {
             if (File.Exists($"db/{filepath}"))
             {
-                return JsonConvert.DeserializeObject<T>(File.ReadAllText($"db/{filepath}"));
+                var tmp = JsonConvert.DeserializeObject<T>(File.ReadAllText($"db/{filepath}"));
+                tmp.filename = filepath;
+                return tmp;
             }
             else
             {
                 T cfg = new T();
-                cfg.SaveDatabase(filepath);
+                cfg.filename = filepath;
+                cfg.SaveDatabase();
                 return cfg;
             }
         }
 
-        public void SaveDatabase(string filepath)
+        public void SaveDatabase()
         {
-            var contents = JsonConvert.SerializeObject(this, Formatting.Indented);
-            if (File.Exists($"db/{filepath}")) { File.Copy($"db/{filepath}", $"db/{filepath}.backup"); }
-            File.WriteAllText($"db/{filepath}", contents);
+            lock (this)
+            {
+                var contents = JsonConvert.SerializeObject(this, Formatting.Indented);
+                if (File.Exists($"db/{filename}")) { File.Copy($"db/{filename}", $"db/{filename}.backup", true); }
+                File.WriteAllText($"db/{filename}", contents);
+            }
         }
     }
 }
