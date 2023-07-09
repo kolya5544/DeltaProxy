@@ -5,6 +5,7 @@ using System.Linq;
 using System.Reflection.Metadata.Ecma335;
 using System.Text;
 using System.Threading.Tasks;
+using static DeltaProxy.modules.ConnectionInfoHolderModule;
 
 namespace DeltaProxy
 {
@@ -43,14 +44,24 @@ namespace DeltaProxy
             return res.TrimEnd(delim);
         }
 
-        public static void SendServerMessage(this StreamWriter sw, string message)
+        public static void SendClientMessage(this ConnectionInfo sw, string message, bool flush = true)
         {
-            sw.WriteLine($":{Program.cfg.serverHostname} {message}");
+            sw.clientQueue.Add($":{Program.cfg.serverHostname} {message}");
+            if (flush) sw.FlushClientQueue();
         }
 
-        public static void SendServerMessage(this StreamWriter sw, string sender, string receiver, string message)
+        public static void SendClientMessage(this ConnectionInfo sw, string sender, string receiver, string message, bool flush = true)
         {
-            sw.WriteLine($":{sender}!proxy@{Program.cfg.serverHostname} NOTICE {receiver} :{message}");
+            sw.clientQueue.Add($":{sender}!proxy@{Program.cfg.serverHostname} NOTICE {receiver} :{message}");
+            if (flush) sw.FlushClientQueue();
+        }
+
+        public static Tuple<string, string, string> ParseIdentifier(this string id)
+        {
+            var splet = id.Trim().Trim(':').Split('@');
+            var final = splet.First().Split('!');
+            var tuple = new Tuple<string, string, string>(final.First(), final.Last(), splet.Last());
+            return tuple;
         }
 
         public static string ToDuration(this long? span)

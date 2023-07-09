@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net.NetworkInformation;
 using System.Reflection;
+using System.Reflection.Metadata.Ecma335;
 using System.Text;
 using System.Threading.Tasks;
 using static DeltaProxy.modules.ConnectionInfoHolderModule;
@@ -23,6 +24,7 @@ namespace DeltaProxy
         public static List<Type> modules = new List<Type>() {
             typeof(ConnectionInfoHolderModule),
             typeof(BansModule),
+            typeof(CaptchaModule),
             typeof(WordBlacklistModule),
             typeof(AdvertisementModule),
             typeof(FirstConnectionKillModule), 
@@ -58,12 +60,21 @@ namespace DeltaProxy
         /// </summary>
         /// <param name="info">Info about this connection</param>
         /// <param name="msg">Message sent by server</param>
-        public static void ProcessServerMessage(ConnectionInfo info, string msg)
+        public static bool ProcessServerMessage(ConnectionInfo info, string msg)
         {
+            // making sure the msg doesn't contain @time timestamp like @time=2023-07-09T13:25:37.688Z
+            if (msg.StartsWith("@time=")) { msg = msg.SplitMessage().ToArray().Join(1); }
+
             foreach (var method in hashed_server)
             {
-                method.Invoke(null, new object[] { info, msg });
+                bool? executionResult = (bool?)method.Invoke(null, new object[] { info, msg });
+
+                // some modules can prevent server messages if they return false boolean.
+                if (executionResult is null) continue;
+                if (executionResult.HasValue && !executionResult.Value) return false;
             }
+
+            return true;
         }
 
         /// <summary>
@@ -77,6 +88,8 @@ namespace DeltaProxy
             foreach (var method in hashed_client)
             {
                 bool executionResult = (bool)method.Invoke(null, new object[] { info, msg });
+
+                if (!executionResult) Program.Log($"{method.DeclaringType.Name} -> {executionResult}");
 
                 if (!executionResult) return false; // halt execution as requested by a module
             }

@@ -21,8 +21,8 @@ namespace DeltaProxy.modules
             if (msgSplit.Assert("376", 1) && msgSplit.AssertCount(5, true)) // expects server to end a MOTD
             {
                 // now we just insert our own MOTD part at the end
-                info.Writer.SendServerMessage($"372 {info.Nickname} :-");
-                info.Writer.SendServerMessage($"372 {info.Nickname} :- This server is powered by DeltaProxy. Advanced bot protection and activity monitoring at {cfg.SourceCode}");
+                info.SendClientMessage($"372 {info.Nickname} :-");
+                info.SendClientMessage($"372 {info.Nickname} :- This server is powered by DeltaProxy. Advanced bot protection and activity monitoring at {cfg.SourceCode}");
             }
         }
 

@@ -29,10 +29,14 @@ namespace DeltaProxy.modules
         {
             var msgSplit = msg.SplitMessage();
 
-            if (msgSplit.Assert("396", 1) && msgSplit.AssertCount(5, true) && msg.GetLongString().Contains("is now your displayed host")) // expects server to set a VHost
+            if (msgSplit.Assert("396", 1) && msgSplit.AssertCount(5, true)) // expects server to set a VHost
             {
                 info.VHost = msgSplit[3];
                 if (info.stored is not null) info.stored.VHost = info.VHost;
+            }
+            if (msgSplit.Assert("433", 1) && msgSplit.AssertCount(4, true) && !info.ChangedNickname) // expects server to decline an already used nickname on first connection
+            {
+                info.Nickname = null;
             }
         }
 
@@ -72,6 +76,7 @@ namespace DeltaProxy.modules
                     TimeSpentTotal = IRCExtensions.UnixMS() - info.ConnectionTimestamp * 1000,
                     Realname = info.Realname
                 };
+                connectedUsers.Add(info);
             }
             return true;
         }
@@ -109,7 +114,7 @@ namespace DeltaProxy.modules
             public string Realname;
 
             public TcpClient Client;
-            public StreamWriter Writer;
+            public StreamWriter Writer; // not recommended to use
             public Stream Stream;
 
             public StreamWriter ServerWriter;
@@ -120,6 +125,18 @@ namespace DeltaProxy.modules
             private StoredConnection _cached;
 
             public bool ChangedNickname = false;
+
+            public List<string> serverQueue = new List<string>();
+            public List<string> clientQueue = new List<string>();
+
+            public void FlushServerQueue()
+            {
+                lock (serverQueue) { serverQueue.ForEach((z) => ServerWriter.WriteLine(z)); serverQueue.Clear(); }
+            }
+            public void FlushClientQueue()
+            {
+                lock (clientQueue) { clientQueue.ForEach((z) => Writer.WriteLine(z)); clientQueue.Clear(); }
+            }
 
             public StoredConnection stored
             {

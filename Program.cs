@@ -145,7 +145,11 @@ namespace DeltaProxy
 
                             // check all CLIENT-side modules
                             var moduleResponse = ModuleHandler.ProcessClientMessage(info, cmd);
-                            if (moduleResponse) { server_sw.WriteLine(cmd); } // only let the message through if all modules allowed it.
+                            if (moduleResponse)
+                            {  // only let the message through if all modules allowed it.
+                                lock (info.serverQueue) info.serverQueue.Add(cmd); 
+                                info.FlushServerQueue();
+                            } 
                         }
                     } catch (Exception ex)
                     {
@@ -163,23 +167,27 @@ namespace DeltaProxy
                     Log($">> {cmd}");
 
                     // check all SERVER-side modules
-                    ModuleHandler.ProcessServerMessage(info, cmd);
+                    var moduleResponse = ModuleHandler.ProcessServerMessage(info, cmd);
 
-                    sentCounter += 1;
-                    if (sentCounter == 10)
+                    if (moduleResponse)
                     {
-                        client_stream.ReadTimeout = authedTimeout;
-                        client_stream.WriteTimeout = authedTimeout;
+                        sentCounter += 1;
+                        if (sentCounter == 10)
+                        {
+                            client_stream.ReadTimeout = authedTimeout;
+                            client_stream.WriteTimeout = authedTimeout;
+                        }
+                        lock (info.clientQueue) info.clientQueue.Add(cmd);
+                        info.FlushClientQueue();
                     }
-                    client_sw.WriteLine(cmd);
                 }
             } catch (Exception ex)
             {
                 Log($"{ex.Message} {ex.StackTrace}");
             } finally
             {
-                client_stream.Close();
-                server_stream.Close();
+                if (client_stream is not null) client_stream.Close();
+                if (server_stream is not null) server_stream.Close();
                 client.Close();
             }
         }

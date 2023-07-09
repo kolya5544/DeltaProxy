@@ -27,17 +27,17 @@ namespace DeltaProxy.modules
 
             if (msgSplit.Assert("PROXYAUTH", 0))
             {
-                if (msgSplit.AssertCount(1)) { info.Writer.SendServerMessage("DeltaProxy", info.Nickname, $"USAGE: /proxyauth <password> - The command is used for staff to auth."); return false; }
+                if (msgSplit.AssertCount(1)) { info.SendClientMessage("DeltaProxy", info.Nickname, $"USAGE: /proxyauth <password> - The command is used for staff to auth."); return false; }
 
                 string password = msgSplit[1];
                 var staff = cfg.staff.FirstOrDefault((z) => (z.Nickname == info.Nickname && z.Password == password) || (!cfg.ShouldNicknameMatch && z.Password == password));
                 if (staff is null)
                 {
-                    info.Writer.SendServerMessage("DeltaProxy", info.Nickname, $"Incorrect PROXYAUTH password or your nickname doesn't match."); return false;
+                    info.SendClientMessage("DeltaProxy", info.Nickname, $"Incorrect PROXYAUTH password or your nickname doesn't match."); return false;
                 }
 
                 lock (authedStaff) authedStaff.Add(info);
-                info.Writer.SendServerMessage("DeltaProxy", info.Nickname, $"Successfully authed as {staff.Nickname}!"); return false;
+                info.SendClientMessage("DeltaProxy", info.Nickname, $"Successfully authed as {staff.Nickname}!"); return false;
             }
 
             return true;

@@ -16,11 +16,44 @@ namespace DeltaProxy.modules
     {
         public static ModuleConfig cfg;
         public static Database db;
+        public static List<Disconnect> disconnects = new(); // holds a list of disconnect reasons
 
         public static void OnEnable()
         {
             cfg = ModuleConfig.LoadConfig("mod_bans.json");
             db = Database.LoadDatabase("bans_db.json");
+        }
+
+        public static bool ResolveServerMessage(ConnectionInfo info, string msg)
+        {
+            var msgSplit = msg.SplitMessage();
+
+            if (msgSplit.Assert("QUIT", 1)) // expects someone to quit - block the message from reaching other users if it's a system quit message
+            {
+                var subject = msgSplit[0].ParseIdentifier();
+
+                string nickname = subject.Item1;
+                string username = subject.Item2;
+                string vhost = subject.Item3;
+
+                lock (connectedUsers) connectedUsers.RemoveAll((z) => z.Nickname == nickname);
+
+                string quitReason = msgSplit.ToArray().Join(2).Trim(':');
+
+                var disconnect = GetDisconnect(nickname);
+
+                if (quitReason.Contains("DeltaProxy Forced Disconnect #")) // this is our unique signature!
+                {
+                    disconnect = GetDisconnect(nickname, quitReason);
+                }
+                if (disconnect is not null)
+                {
+                    lock (info.clientQueue) info.clientQueue.Add($":{nickname}!{username}@{vhost} QUIT :DeltaProxy: {disconnect.reason}");
+                    return false;
+                }
+            }
+
+            return true;
         }
 
         public static bool ResolveClientMessage(ConnectionInfo info, string msg)
@@ -38,7 +71,7 @@ namespace DeltaProxy.modules
 
                 if (ban is not null)
                 {
-                    info.Writer.SendServerMessage($"NOTICE * :*** DeltaProxy: {ReplacePlaceholders(ban, cfg.banConnectMessage)}");
+                    info.SendClientMessage($"NOTICE * :*** DeltaProxy: {ReplacePlaceholders(ban, cfg.banConnectMessage)}");
                     ProperDisconnect(info, $"User was banned.");
                 }
             }
@@ -54,7 +87,7 @@ namespace DeltaProxy.modules
 
                 if (mute is not null)
                 {
-                    info.Writer.SendServerMessage("DeltaProxy", info.Nickname, ReplacePlaceholders(mute, cfg.talkMutedMessage));
+                    info.SendClientMessage("DeltaProxy", info.Nickname, ReplacePlaceholders(mute, cfg.talkMutedMessage));
                     return false;
                 }
             }
@@ -64,8 +97,51 @@ namespace DeltaProxy.modules
 
         public static void ProperDisconnect(ConnectionInfo info, string reason = "Disconnected by DeltaProxy.")
         {
-            info.ServerWriter.WriteLine($"QUIT :{reason}");
+            var disconnectID = CreateDisconnect(info.Nickname, reason);
+
+            lock (info.serverQueue) info.serverQueue.Add($"QUIT :DeltaProxy Forced Disconnect #{disconnectID}");
+            info.FlushServerQueue();
+
             info.Client.Close();
+        }
+
+        public static Disconnect? GetDisconnect(string nickname, string reason)
+        {
+            // remove older disconnects
+            lock (disconnects) disconnects.RemoveAll((z) => IRCExtensions.Unix() - z.issued > 5);
+
+            var extr = reason.Split('#').Last();
+
+            long id = 0;
+            bool success = long.TryParse(extr, out id);
+            if (!success) return null;
+
+            Disconnect d;
+            lock (disconnects) d = disconnects.FirstOrDefault((z) => z.id == id && z.nickname == nickname);
+            return d;
+        }
+
+        public static Disconnect? GetDisconnect(string nickname)
+        {
+            // remove older disconnects
+            lock (disconnects) disconnects.RemoveAll((z) => IRCExtensions.Unix() - z.issued > 5);
+
+            Disconnect d;
+            lock (disconnects) d = disconnects.FirstOrDefault((z) => z.nickname == nickname);
+            return d;
+        }
+
+        private static long CreateDisconnect(string nickname, string reason)
+        {
+            var z = new Disconnect()
+            {
+                reason = reason,
+                issued = IRCExtensions.Unix(),
+                id = Disconnect.currentId++,
+                nickname = nickname
+            };
+            lock (disconnects) disconnects.Add(z);
+            return z.id;
         }
 
         public static string ReplacePlaceholders(Punishment punishment, string msg)
@@ -75,6 +151,15 @@ namespace DeltaProxy.modules
                       .Replace("{issuer}", punishment.Issuer is null ? "DeltaProxy" : punishment.Issuer);
         }
 
+        public class Disconnect
+        {
+            public static long currentId = 0;
+
+            public string reason;
+            public string nickname;
+            public long issued;
+            public long id;
+        }
 
         public class ModuleConfig : ConfigBase<ModuleConfig>
         {

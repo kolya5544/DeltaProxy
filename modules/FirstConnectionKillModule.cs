@@ -63,7 +63,7 @@ namespace DeltaProxy.modules
             lock (db.allowedList) db.allowedList.Add(new Database.AllowedEntry() { Nickname = info.Nickname, IPAddress = info.IP, DateNoticed = IRCExtensions.Unix(), didReconnect = false });
 
             // here we'll have to pretend to be server and send an informative message
-            info.Writer.SendServerMessage($"NOTICE * :*** DeltaProxy: {cfg.KillMessage}");
+            info.SendClientMessage($"NOTICE * :*** DeltaProxy: {cfg.KillMessage}");
             BansModule.ProperDisconnect(info, $"Killed for connection scan.");
         }
 
