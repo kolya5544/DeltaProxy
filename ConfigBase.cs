@@ -9,23 +9,31 @@ namespace DeltaProxy
 {
     public abstract class ConfigBase<T> where T : ConfigBase<T>, new()
     {
+        private string filename;
+
         public static T LoadConfig(string filepath)
         {
             if (File.Exists($"conf/{filepath}"))
             {
-                return JsonConvert.DeserializeObject<T>(File.ReadAllText($"conf/{filepath}"));
+                var tmp = JsonConvert.DeserializeObject<T>(File.ReadAllText($"conf/{filepath}"));
+                tmp.filename = filepath;
+                return tmp;
             }
             else
             {
                 T cfg = new T();
-                cfg.SaveConfig(filepath);
+                cfg.filename = filepath;
+                cfg.SaveConfig();
                 return cfg;
             }
         }
 
-        public void SaveConfig(string filepath)
+        public void SaveConfig()
         {
-            File.WriteAllText($"conf/{filepath}", JsonConvert.SerializeObject(this, Formatting.Indented));
+            lock (this)
+            {
+                File.WriteAllText($"conf/{filename}", JsonConvert.SerializeObject(this, Formatting.Indented));
+            }
         }
     }
 }

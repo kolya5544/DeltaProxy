@@ -29,6 +29,7 @@ namespace DeltaProxy
             typeof(AdvertisementModule),
             typeof(FirstConnectionKillModule), 
             typeof(StaffAuthModule),
+            typeof(AdminConfigModule)
         };
 
         private static List<MethodInfo> hashed_server = new();
@@ -160,9 +161,9 @@ namespace DeltaProxy
                 var isEnabled = (bool)isEnabledField.GetValue(cfgInstance);
 
                 // if cfg is present, isEnabled is present and it's true, call the module
-                if (isEnabled) { return true; }
+                return isEnabled;
             }
-            return false;
+            return true;
         }
     }
 }

@@ -22,7 +22,7 @@ namespace DeltaProxy.modules
         {
             var msgSplit = msg.SplitMessage();
 
-            if (!cfg.captchaEnabled) return true;
+            var captchaActions = cfg.captchaActions.Split(',');
 
             // remove captchas with used-up passes
             if (cfg.captchaPass != -1)
@@ -93,7 +93,7 @@ namespace DeltaProxy.modules
                 }
             }
 
-            if (cfg.captchaActions.Contains(currentAction))
+            if (captchaActions.Contains(currentAction))
             {
                 if (activeCaptcha is not null && activeCaptcha.passed && activeCaptcha.action == currentAction) { activeCaptcha.passUsed += 1; return true; }
                 if (activeCaptcha is not null && activeCaptcha.action == currentAction) { AlertCaptcha(info, activeCaptcha); return currentAction == "connection"; }
@@ -155,9 +155,8 @@ namespace DeltaProxy.modules
 
         public class ModuleConfig : ConfigBase<ModuleConfig>
         {
-            public bool isEnabled = true;
-            public bool captchaEnabled = false;
-            public List<string> captchaActions = new(); // list of actions that will trigger a captcha. Available actions: "connection", "nickserv" (registration), "chanserv" (channel registration)
+            public bool isEnabled = false;
+            public string captchaActions = "nickserv,chanserv"; // list of actions that will trigger a captcha. Available actions: "connection", "nickserv" (registration), "chanserv" (channel registration)
             public string captchaType = "text"; // available values: text (retype a code), math (a simple operation, like 21 + 9)
             public long timeLimit = 300; // 5 minutes to solve a captcha
             public long maxAttempts = 5; // how many attempts one can do before being disconnected from the server

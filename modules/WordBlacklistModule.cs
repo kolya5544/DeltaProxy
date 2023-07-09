@@ -53,14 +53,14 @@ namespace DeltaProxy.modules
                     if (msgSplit.Assert("help", 1))
                     {
                         info.SendClientMessage("DeltaProxy", info.Nickname, $"BL - help -> Shows this message");
-                        info.SendClientMessage("DeltaProxy", info.Nickname, $"BL - add [<action> <duration> <warnings>] <substring> -> Adds a new substring. Actions: kick, mute, ban. Duration is in seconds. Warnings is the amount of warnings a user will get before action. Default action is ban, duration is 1 day, and 0 warnings. Example: /blacklist add This network is awful");
+                        info.SendClientMessage("DeltaProxy", info.Nickname, $"BL - add [<action> <duration> <warnings>] <substring> -> Adds a new substring. Actions: kick, mute, ban. Duration is in seconds. Warnings is the amount of warnings a user will get before action. Default action is ban, duration is 1 day, and 0 warnings. Start your string with / to indicate a regexp. Example: /blacklist add /p[o0]rn[o0]gr[a@]phy");
                         info.SendClientMessage("DeltaProxy", info.Nickname, $"BL - remove <substring> -> Removes a substring");
                         info.SendClientMessage("DeltaProxy", info.Nickname, $"BL - list -> Lists all substrings");
                     }
                     else if (msgSplit.Assert("list", 1))
                     {
                         List<string> messages = new List<string>();
-                        lock (db.patterns) db.patterns.ForEach((z) => { messages.Add($"BL - \"{z.entry}\", ACT: {z.action}, DUR: {(z.duration is null ? "eternal" : $"{z.duration} seconds ({z.duration.ToDuration()})")}"); });
+                        lock (db.patterns) db.patterns.ForEach((z) => { messages.Add($"BL - \"{z.entry}\", ACT: {z.action}, DUR: {(z.duration is null ? "eternal" : $"{z.duration} seconds ({z.duration.ToDuration()})")}{(z.entry.StartsWith("/") ? " (RegEx: Yes)": "")}"); });
 
                         foreach (string s in messages)
                         {
@@ -289,8 +289,14 @@ namespace DeltaProxy.modules
         public static bool SanitizeCompare(string message, string pattern)
         {
             var s = Sanitize(message);
-
-            if (s.Any(x => x.Contains(pattern.ToLower()))) return true;
+            var regex = new Regex(pattern.Trim('/'));
+            if (!pattern.StartsWith("/"))
+            {
+                if (s.Any(x => x.Contains(pattern.ToLower()))) return true;
+            } else
+            {
+                if (s.Any(x => regex.IsMatch(message))) return true;
+            }
             return false;
         }
 
