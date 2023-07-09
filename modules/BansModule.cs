@@ -14,8 +14,14 @@ namespace DeltaProxy.modules
     /// </summary>
     public class BansModule
     {
-        public static ModuleConfig cfg = ModuleConfig.LoadConfig("mod_bans.json");
-        public static Database db = Database.LoadDatabase("bans_db.json");
+        public static ModuleConfig cfg;
+        public static Database db;
+
+        public static void OnEnable()
+        {
+            cfg = ModuleConfig.LoadConfig("mod_bans.json");
+            db = Database.LoadDatabase("bans_db.json");
+        }
 
         public static bool ResolveClientMessage(ConnectionInfo info, string msg)
         {

@@ -18,6 +18,9 @@ namespace DeltaProxy
             Directory.CreateDirectory("db");
             Directory.CreateDirectory("certs");
 
+            Log($"Enabling modules...");
+            ModuleHandler.EnableModules();
+
             InitializeServer();
             if (cfg.allowPlaintext) InitializeServer(isSSL: false);
 

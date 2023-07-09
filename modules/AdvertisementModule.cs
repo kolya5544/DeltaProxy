@@ -12,7 +12,7 @@ namespace DeltaProxy.modules
     /// </summary>
     public class AdvertisementModule
     {
-        public static ModuleConfig cfg = ModuleConfig.LoadConfig("mod_advertisement.conf");
+        public static ModuleConfig cfg;
 
         public static void ResolveServerMessage(ConnectionInfo info, string msg)
         {
@@ -24,6 +24,11 @@ namespace DeltaProxy.modules
                 info.Writer.SendServerMessage($"372 {info.Nickname} :-");
                 info.Writer.SendServerMessage($"372 {info.Nickname} :- This server is powered by DeltaProxy. Advanced bot protection and activity monitoring at {cfg.SourceCode}");
             }
+        }
+
+        public static void OnEnable()
+        {
+            cfg = ModuleConfig.LoadConfig("mod_advertisement.conf");
         }
 
         public class ModuleConfig : ConfigBase<ModuleConfig>

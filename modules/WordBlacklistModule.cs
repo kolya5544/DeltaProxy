@@ -297,9 +297,12 @@ namespace DeltaProxy.modules
         {
             public Offender(ConnectionInfo ci)
             {
-                Nickname = ci.Nickname;
-                IP = ci.IP;
-                Client = ci.Client;
+                var properties = typeof(ConnectionInfo).GetProperties();
+                foreach (var property in properties)
+                {
+                    var value = property.GetValue(ci);
+                    property.SetValue(this, value);
+                }
             }
 
             public Dictionary<Database.Pattern, int> warnings = new();

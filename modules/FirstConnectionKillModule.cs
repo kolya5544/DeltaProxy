@@ -12,8 +12,14 @@ namespace DeltaProxy.modules
     /// </summary>
     public class FirstConnectionKillModule
     {
-        public static ModuleConfig cfg = ModuleConfig.LoadConfig("mod_firstkill.json");
-        public static Database db = Database.LoadDatabase("firstkill_db.json");
+        public static ModuleConfig cfg;
+        public static Database db;
+
+        public static void OnEnable()
+        {
+            cfg = ModuleConfig.LoadConfig("mod_firstkill.json");
+            db = Database.LoadDatabase("firstkill_db.json");
+        }
 
         public static bool ResolveClientMessage(ConnectionInfo info, string msg)
         {

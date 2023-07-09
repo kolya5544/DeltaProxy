@@ -2,6 +2,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net.NetworkInformation;
+using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 using static DeltaProxy.modules.ConnectionInfoHolderModule;
@@ -10,6 +12,47 @@ namespace DeltaProxy
 {
     public class ModuleHandler
     {
+        public enum Active
+        {
+            No = 0, Server = 1, Client = 2
+        }
+
+        /// <summary>
+        /// List of modules. The order which they are here is the order in which a message will be processed!
+        /// </summary>
+        public static List<Type> modules = new List<Type>() {
+            typeof(ConnectionInfoHolderModule),
+            typeof(BansModule),
+            typeof(WordBlacklistModule),
+            typeof(AdvertisementModule),
+            typeof(FirstConnectionKillModule), 
+            typeof(StaffAuthModule),
+        };
+
+        private static List<MethodInfo> hashed_server = new();
+        private static List<MethodInfo> hashed_client = new();
+
+        /// <summary>
+        /// Enables all modules by calling OnEnable within enabled modules.
+        /// </summary>
+        public static void EnableModules()
+        {
+            // first we enable modules
+            foreach (var moduleType in modules)
+            {
+                Program.Log($"Enabling module {moduleType.Name}...");
+                var onEnableMethod = moduleType.GetMethod("OnEnable", BindingFlags.Public | BindingFlags.Static);
+                if (onEnableMethod is not null) // we enable ALL modules, regardless of whether or not they wish to be enabled, to init configs and databases
+                {
+                    onEnableMethod.Invoke(null, null);
+                }
+            }
+
+            // then we hash the lists of enabled modules for server & client processors
+            HashModules();
+            // any module editing its isEnabled property during runtime will have to HashModules!!!!
+        }
+
         /// <summary>
         /// Processes server message
         /// </summary>
@@ -17,9 +60,10 @@ namespace DeltaProxy
         /// <param name="msg">Message sent by server</param>
         public static void ProcessServerMessage(ConnectionInfo info, string msg)
         {
-            ConnectionInfoHolderModule.ResolveServerMessage(info, msg);
-            if (AdvertisementModule.cfg.isEnabled) AdvertisementModule.ResolveServerMessage(info, msg);
-            if (WordBlacklistModule.cfg.isEnabled) WordBlacklistModule.ResolveServerMessage(info, msg);
+            foreach (var method in hashed_server)
+            {
+                method.Invoke(null, new object[] { info, msg });
+            }
         }
 
         /// <summary>
@@ -30,15 +74,82 @@ namespace DeltaProxy
         /// <returns>Whether or not the message should be forwarded to server.</returns>
         public static bool ProcessClientMessage(ConnectionInfo info, string msg)
         {
-            bool result = true;
+            foreach (var method in hashed_client)
+            {
+                bool executionResult = (bool)method.Invoke(null, new object[] { info, msg });
 
-            result &= ConnectionInfoHolderModule.ResolveClientMessage(info, msg);
-            result &= BansModule.cfg.isEnabled ? BansModule.ResolveClientMessage(info, msg) : true;
-            result &= FirstConnectionKillModule.cfg.isEnabled ? FirstConnectionKillModule.ResolveClientMessage(info, msg) : true;
-            result &= WordBlacklistModule.cfg.isEnabled ? WordBlacklistModule.ResolveClientMessage(info, msg) : true;
-            result &= StaffAuthModule.ResolveClientMessage(info, msg);
+                if (!executionResult) return false; // halt execution as requested by a module
+            }
 
-            return result;
+            return true;
+        }
+
+        /// <summary>
+        /// Builds a list of currently active and enabled modules, ready to receive server & client messages
+        /// </summary>
+        public static void HashModules()
+        {
+            lock (hashed_server)
+            {
+                lock (hashed_client)
+                {
+                    foreach (var moduleType in modules)
+                    {
+                        var tuple = IsModuleActive(moduleType);
+                        var activity = tuple.Item1;
+
+                        if (((int)activity & (int)Active.Server) != 0) hashed_server.Add(tuple.Item2[0]);
+                        if (((int)activity & (int)Active.Client) != 0) hashed_client.Add(tuple.Item2[1]);
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Checks whether or not a module implements client and/or server functionality, as well as returns the list of methods with said functionality implemented
+        /// </summary>
+        /// <param name="module"></param>
+        /// <returns></returns>
+
+        public static Tuple<Active, List<MethodInfo>> IsModuleActive(Type module)
+        {
+            int flag = 0;
+            var list = new List<MethodInfo>();
+
+            bool enabled = CheckIsEnabledCfg(module);
+            if (!enabled) return new Tuple<Active, List<MethodInfo>>((Active)flag, list);
+
+            var resolveServerMessageMethod = module.GetMethod("ResolveServerMessage", BindingFlags.Public | BindingFlags.Static);
+            if (resolveServerMessageMethod is not null)
+            {
+                flag |= (int)Active.Server;
+            }
+            list.Add(resolveServerMessageMethod);
+            var resolveClientMessageMethod = module.GetMethod("ResolveClientMessage", BindingFlags.Public | BindingFlags.Static);
+            if (resolveClientMessageMethod is not null)
+            {
+                flag |= (int)Active.Client;
+            }
+            list.Add(resolveClientMessageMethod);
+
+            return new Tuple<Active, List<MethodInfo>>((Active)flag, list);
+        }
+
+        public static bool CheckIsEnabledCfg(Type module)
+        {
+            var cfgField = module.GetField("cfg");
+            if (cfgField is null) { return true; } // if no cfg is defined, call the module
+            var cfgInstance = cfgField.GetValue(null);
+            var isEnabledField = cfgField.FieldType.GetField("isEnabled");
+            if (isEnabledField is null) { return true; } // if no isEnabled field is present, call the module
+            if (isEnabledField.FieldType == typeof(bool))
+            {
+                var isEnabled = (bool)isEnabledField.GetValue(cfgInstance);
+
+                // if cfg is present, isEnabled is present and it's true, call the module
+                if (isEnabled) { return true; }
+            }
+            return false;
         }
     }
 }

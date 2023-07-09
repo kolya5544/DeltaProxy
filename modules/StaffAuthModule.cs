@@ -12,8 +12,14 @@ namespace DeltaProxy.modules
     /// </summary>
     public class StaffAuthModule
     {
-        public static ModuleConfig cfg = ModuleConfig.LoadConfig("mod_staff.json");
-        public static List<ConnectionInfo> authedStaff = new();
+        public static ModuleConfig cfg;
+        public static List<ConnectionInfo> authedStaff;
+
+        public static void OnEnable()
+        {
+            cfg = ModuleConfig.LoadConfig("mod_staff.json");
+            authedStaff = new List<ConnectionInfo>();
+        }
 
         public static bool ResolveClientMessage(ConnectionInfo info, string msg)
         {

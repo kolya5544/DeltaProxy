@@ -16,8 +16,14 @@ namespace DeltaProxy.modules
     public class ConnectionInfoHolderModule
     {
         public static List<ConnectionInfo> connectedUsers = new List<ConnectionInfo>();
-        public static ModuleConfig cfg = ModuleConfig.LoadConfig("mod_conninfo.json");
-        public static Database db = Database.LoadDatabase("conninfo_db.json");
+        public static ModuleConfig cfg;
+        public static Database db;
+
+        public static void OnEnable()
+        {
+            cfg = ModuleConfig.LoadConfig("mod_conninfo.json");
+            db = Database.LoadDatabase("conninfo_db.json");
+        }
 
         public static void ResolveServerMessage(ConnectionInfo info, string msg)
         {
