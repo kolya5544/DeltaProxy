@@ -23,13 +23,13 @@ namespace DeltaProxy
         /// </summary>
         public static List<Type> modules = new List<Type>() {
             typeof(ConnectionInfoHolderModule),
-            typeof(BansModule),
+            /*typeof(BansModule),
             typeof(CaptchaModule),
             typeof(WordBlacklistModule),
             typeof(AdvertisementModule),
             typeof(FirstConnectionKillModule), 
             typeof(StaffAuthModule),
-            typeof(AdminConfigModule)
+            typeof(AdminConfigModule)*/
         };
 
         private static List<MethodInfo> hashed_server = new();
@@ -40,20 +40,54 @@ namespace DeltaProxy
         /// </summary>
         public static void EnableModules()
         {
-            // first we enable modules
-            foreach (var moduleType in modules)
+            // we first load the built-in ConnectionInfo module
+            ConnectionInfoHolderModule.OnEnable();
+
+            Program.Log($"Successfully enabled ConnectionInfoHolderModule");
+
+            // don't forget to resolve dependencies
+            AppDomain.CurrentDomain.AssemblyResolve += CurrentDomain_AssemblyResolve;
+
+            // then we load the rest of modules in /modules/ folder
+            var moduleList = Directory.EnumerateFiles("modules", "*.dll").ToList();
+
+            foreach (var module in moduleList)
             {
-                Program.Log($"Enabling module {moduleType.Name}...");
-                var onEnableMethod = moduleType.GetMethod("OnEnable", BindingFlags.Public | BindingFlags.Static);
-                if (onEnableMethod is not null) // we enable ALL modules, regardless of whether or not they wish to be enabled, to init configs and databases
-                {
-                    onEnableMethod.Invoke(null, null);
-                }
+                // that's one way to resolve dependencies
+                var lib = File.ReadAllBytes(module);
+                var dll = Assembly.Load(lib);
+
+                var moduleTypes = dll.GetTypes();
+
+                // we consider main class to be one containing "OnEnable" method. Thus, it has to be implemented by ALL modules.
+                Type mainClass = moduleTypes.FirstOrDefault((z) => z.GetMethods().Any((x) => x.Name == "OnEnable"));
+
+                if (mainClass is null) { Program.Log($"Failure loading {Path.GetFileName(module)}. Couldn't find main class."); continue; }
+
+                // the method MUST be public static
+                var mainMethod = mainClass.GetMethod("OnEnable", BindingFlags.Static | BindingFlags.Public);
+
+                if (mainMethod is null) { Program.Log($"Failure loading {Path.GetFileName(module)}. Couldn't find public static OnEnable method."); continue; }
+
+                // we enable ALL modules, regardless of whether or not they wish to be enabled, to init configs and databases
+                mainMethod.Invoke(null, null);
+
+                modules.Add(mainClass);
+
+                Program.Log($"Successfully enabled {mainClass.Name}...");
             }
+
+            Program.Log($"Success enabling all modules! Building method lists...");
 
             // then we hash the lists of enabled modules for server & client processors
             HashModules();
             // any module editing its isEnabled property during runtime will have to HashModules!!!!
+        }
+
+        private static Assembly? CurrentDomain_AssemblyResolve(object? sender, ResolveEventArgs args)
+        {
+            var assembly = ((AppDomain)sender).GetAssemblies().FirstOrDefault((z) => z.FullName == args.Name);
+            return assembly;
         }
 
         /// <summary>
@@ -88,11 +122,17 @@ namespace DeltaProxy
         {
             foreach (var method in hashed_client)
             {
-                bool executionResult = (bool)method.Invoke(null, new object[] { info, msg });
+                try
+                {
+                    bool executionResult = (bool)method.Invoke(null, new object[] { info, msg });
 
-                if (!executionResult) Program.Log($"{method.DeclaringType.Name} -> {executionResult}");
+                    if (!executionResult) Program.Log($"{method.DeclaringType.Name} -> {executionResult}");
 
-                if (!executionResult) return false; // halt execution as requested by a module
+                    if (!executionResult) return false; // halt execution as requested by a module
+                } catch (Exception ex)
+                {
+                    Program.Log($"Fatal Exception by module {method.DeclaringType.Name}: {ex.Message} {ex.StackTrace}");
+                }
             }
 
             return true;

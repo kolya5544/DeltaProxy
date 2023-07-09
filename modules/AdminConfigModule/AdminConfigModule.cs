@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 using static DeltaProxy.modules.ConnectionInfoHolderModule;
@@ -55,13 +56,16 @@ namespace DeltaProxy.modules
                             var isEnabled = ModuleHandler.CheckIsEnabledCfg(module);
                             info.SendClientMessage("DeltaProxy", info.Nickname, $"[A] = Module '{module.Name}' -> [{(isEnabled ? "ONLINE" : "OFFLINE")}]");
                         }
-                    } else if (msgSplit.Assert("enable", 1))
+                    }
+                    else if (msgSplit.Assert("enable", 1))
                     {
                         ToggleModule(info, ac, true);
-                    } else if (msgSplit.Assert("disable", 1))
+                    }
+                    else if (msgSplit.Assert("disable", 1))
                     {
                         ToggleModule(info, ac, false);
-                    } else if (msgSplit.Assert("cfg", 1))
+                    }
+                    else if (msgSplit.Assert("cfg", 1))
                     {
                         if (ac.ModuleChosen is null)
                         {
@@ -116,7 +120,7 @@ namespace DeltaProxy.modules
                         var cfgProperties = cfgInstance.GetType().GetFields();
 
                         var prop = cfgProperties.FirstOrDefault(x => x.Name == name);
-                        
+
                         if (prop is null)
                         {
                             info.SendClientMessage("DeltaProxy", info.Nickname, cfg.error_no_propery); return false;
@@ -128,7 +132,8 @@ namespace DeltaProxy.modules
                         {
                             var arr = value.Split(',').ToList();
                             prop.SetValue(cfgInstance, arr);
-                        } else
+                        }
+                        else
                         {
                             var obj = typeConverter.ConvertFromString(value);
                             prop.SetValue(cfgInstance, obj);

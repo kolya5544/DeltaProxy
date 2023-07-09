@@ -1,10 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Linq;
+﻿using DeltaProxy;
 using System.Net.Sockets;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace DeltaProxy.modules
 {
@@ -12,6 +7,7 @@ namespace DeltaProxy.modules
     /// This module keeps track of connections: it stores current connection info (nickname, username, IP, VHost), as well as keeps track of when last connection with the same nickname+username pair occured.
     /// It does NOT keep track of auth, and it is NOT to be relied on for auth. For auth, please check auth module.
     /// This module is both SERVER and CLIENT-side and is ALWAYS enabled.
+    /// It is also the only BUILT-IN module, since ModuleHandle relies on it.
     /// </summary>
     public class ConnectionInfoHolderModule
     {

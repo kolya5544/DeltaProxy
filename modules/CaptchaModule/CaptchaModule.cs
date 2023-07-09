@@ -61,7 +61,7 @@ namespace DeltaProxy.modules
                 if (msgSplit.Assert("PRIVMSG", 0) && msgSplit.Assert("CaptchSRV", 1) && msgSplit.AssertCount(3, true)) // expect a PRIVMSG CaptchSRV with captcha solution
                 {
                     string solution = msgSplit[2].Trim(':');
-                    
+
                     if (activeCaptcha.solution == solution) // success!
                     {
                         info.SendClientMessage("CaptchSRV", info.Nickname, cfg.success_msg);
@@ -87,8 +87,9 @@ namespace DeltaProxy.modules
                 var cblockHit = cfg.preventCommands.Split(',').FirstOrDefault((z) => msgSplit.Assert(z.Trim(), 0));
                 if (cfg.captchaBlock && cblockHit is not null) // a captcha block is enabled! prevent commands defined in config
                 {
-                    if ((cblockHit.ToLower() == "nick" && !info.ChangedNickname) || cblockHit.ToLower() != "nick") { 
-                        AlertCaptcha(info, activeCaptcha); return false; 
+                    if ((cblockHit.ToLower() == "nick" && !info.ChangedNickname) || cblockHit.ToLower() != "nick")
+                    {
+                        AlertCaptcha(info, activeCaptcha); return false;
                     }
                 }
             }
@@ -119,7 +120,8 @@ namespace DeltaProxy.modules
             if (cfg.captchaType == "text")
             {
                 captcha.text = rng.Next(1000000, 9999999).ToString();
-            } else if (cfg.captchaType == "math")
+            }
+            else if (cfg.captchaType == "math")
             {
                 captcha.operandOne = rng.Next(1, 20);
                 captcha.operandTwo = rng.Next(1, 20);

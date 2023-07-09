@@ -44,7 +44,8 @@ namespace DeltaProxy.modules
                     lock (db.allowedList) db.allowedList.Remove(ticket);
                     IssueNewTicket(info);
                     return false;
-                } else
+                }
+                else
                 {
                     // in all other cases, mark ticket as successful and move on
                     if (ticket.didReconnect != true)

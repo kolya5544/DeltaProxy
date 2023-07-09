@@ -7,7 +7,7 @@ using static DeltaProxy.modules.ConnectionInfoHolderModule;
 
 namespace DeltaProxy
 {
-    internal class Program
+    public class Program
     {
         public static X509Certificate? serverCert;
         public static Config cfg = Config.LoadConfig("config.json");

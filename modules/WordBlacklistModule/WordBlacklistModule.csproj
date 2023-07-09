@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\DeltaProxy\DeltaProxy.csproj" />
+    <ProjectReference Include="..\BansModule\BansModule.csproj" />
+    <ProjectReference Include="..\StaffAuthModule\StaffAuthModule.csproj" />
+  </ItemGroup>
+
+  <Target Name="PostBuild" AfterTargets="PostBuildEvent">
+    <Exec Command="echo f | xcopy /f /y $(ProjectDir)$(OutDir)$(ProjectName).dll $(ProjectDir)..\..\DeltaProxy\$(OutDir)modules\$(ProjectName).dll" />
+  </Target>
+
+</Project>
