@@ -115,6 +115,8 @@ namespace DeltaProxy
         /// </summary>
         private static void SetPrioritiesUp()
         {
+            lock (modules) modules = modules.OrderBy((z) => z.Name).ToList();
+
             hashed_client = hashed_client.OrderBy((z) =>
             {
                 return GetPriorityOfMethod(z, "CLIENT_PRIORITY");

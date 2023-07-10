@@ -32,6 +32,8 @@ namespace VKBridgeModule
         public static LookupCache lc;
         public static WebServer web;
         public static CancellationTokenSource cancelTokenSource;
+        public static CancellationTokenSource messagesThread;
+        public static CancellationTokenSource userUpdateThread;
 
         public static bool ResolveClientMessage(ConnectionInfo info, string msg)
         {
@@ -209,6 +211,8 @@ namespace VKBridgeModule
             db = Database.LoadDatabase("vkbridge_db.json");
             lc = new LookupCache();
             cancelTokenSource = new CancellationTokenSource();
+            messagesThread = new CancellationTokenSource();
+            userUpdateThread = new CancellationTokenSource();
             if (VKBridgeModule.cfg.isEnabled)
             {
                 new Thread(() =>
@@ -224,6 +228,8 @@ namespace VKBridgeModule
                         try
                         {
                             var msg = bot.ReceiveMessage();
+
+                            if (messagesThread.IsCancellationRequested) break;
 
                             foreach (Update u in msg.Updates)
                             {
@@ -242,6 +248,7 @@ namespace VKBridgeModule
                     while (true)
                     {
                         Thread.Sleep(20000); // update new users, online statuses etc every 20 seconds
+                        if (userUpdateThread.IsCancellationRequested) break;
                         try
                         {
                             VKMessageProcessor.UpdateUsers();
@@ -261,7 +268,7 @@ namespace VKBridgeModule
                 .WithWebApi("/", Controller.AsText, m => m
                     .WithController<Controller>());
 
-                Logger.UnregisterLogger<ConsoleLogger>();
+                try { Logger.UnregisterLogger<ConsoleLogger>(); } catch { }
 
                 web.RunAsync(cancelTokenSource.Token);
 
@@ -272,6 +279,8 @@ namespace VKBridgeModule
         public static void OnDisable()
         {
             cancelTokenSource.Cancel();
+            messagesThread.Cancel();
+            userUpdateThread.Cancel();
         }
 
 

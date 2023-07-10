@@ -21,6 +21,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "StaffAuthModule", "..\modul
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VKBridgeModule", "..\modules\VKBridgeModule\VKBridgeModule.csproj", "{C04DFEC4-F610-4BAE-8783-8D3F1A6CBC3F}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PronounsModule", "..\modules\PronounsModule\PronounsModule.csproj", "{67E0CEF6-CAF0-478E-B430-57D2AA038FE6}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -63,6 +65,10 @@ Global
 		{C04DFEC4-F610-4BAE-8783-8D3F1A6CBC3F}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{C04DFEC4-F610-4BAE-8783-8D3F1A6CBC3F}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{C04DFEC4-F610-4BAE-8783-8D3F1A6CBC3F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{67E0CEF6-CAF0-478E-B430-57D2AA038FE6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{67E0CEF6-CAF0-478E-B430-57D2AA038FE6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{67E0CEF6-CAF0-478E-B430-57D2AA038FE6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{67E0CEF6-CAF0-478E-B430-57D2AA038FE6}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

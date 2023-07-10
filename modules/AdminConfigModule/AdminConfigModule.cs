@@ -204,7 +204,7 @@ namespace DeltaProxy.modules
 
             ModuleHandler.modules.Remove(ac.ModuleChosen);
 
-            info.SendClientMessage("DeltaProxy", info.Nickname, $"[A] = Disabled '{ac.ModuleChosen.Name}'.");
+            info.SendClientMessage("DeltaProxy", info.Nickname, $"[A] = Disabled '{ac.ModuleChosen.Name}'. Trying to enable it back...");
 
             // then we'll try to load the assembly again
             var mainClass = ModuleHandler.LoadModule($"modules/{ac.ModuleChosen.Name}.dll");
@@ -214,6 +214,7 @@ namespace DeltaProxy.modules
             ac.ModuleChosen = mainClass;
 
             // if it doesn't work, well too bad.
+            info.SendClientMessage("DeltaProxy", info.Nickname, $"[A] = Enabled '{ac.ModuleChosen.Name}'!");
         }
 
         public static void SaveConfig(Type module)

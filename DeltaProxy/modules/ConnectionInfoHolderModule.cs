@@ -57,6 +57,10 @@ namespace DeltaProxy.modules
                     info.Realname = msg.GetLongString();
                 }
             }
+            if (msgSplit.Assert("SETNAME", 0))
+            {
+                info.Realname = msgSplit.ToArray().Join(1);
+            }
 
             if (info.stored is not null) // don't forget to update the time spent total!!
             {
@@ -151,11 +155,19 @@ namespace DeltaProxy.modules
 
             public void FlushServerQueue()
             {
-                lock (serverQueue) { serverQueue.ForEach((z) => ServerWriter.WriteLine(z)); serverQueue.Clear(); }
+                try
+                {
+                    lock (serverQueue) { serverQueue.ForEach((z) => ServerWriter.WriteLine(z)); serverQueue.Clear(); }
+                }
+                catch { }
             }
             public void FlushClientQueue()
             {
-                lock (clientQueue) { clientQueue.ForEach((z) => Writer.WriteLine(z)); clientQueue.Clear(); }
+                try
+                {
+                    lock (clientQueue) { clientQueue.ForEach((z) => Writer.WriteLine(z)); clientQueue.Clear(); }
+                }
+                catch { }
             }
 
             public StoredConnection stored
