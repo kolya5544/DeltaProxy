@@ -32,8 +32,8 @@ namespace DeltaProxy
             typeof(AdminConfigModule)*/
         };
 
-        private static List<MethodInfo> hashed_server = new();
-        private static List<MethodInfo> hashed_client = new();
+        public static List<MethodInfo> hashed_server = new();
+        public static List<MethodInfo> hashed_client = new();
 
         /// <summary>
         /// Enables all modules by calling OnEnable within enabled modules.
@@ -48,13 +48,42 @@ namespace DeltaProxy
             // don't forget to resolve dependencies
             AppDomain.CurrentDomain.AssemblyResolve += CurrentDomain_AssemblyResolve;
 
+            // first we load all the dependencies modules might need from /deps/ folder
+            var depsList = Directory.EnumerateFiles("deps", "*.dll").ToList();
+            foreach (var dependency in depsList)
+            {
+                // load dependency
+                var lib = File.ReadAllBytes(dependency);
+                var dep = Assembly.Load(lib);
+            }
+
             // then we load the rest of modules in /modules/ folder
             var moduleList = Directory.EnumerateFiles("modules", "*.dll").ToList();
 
             foreach (var module in moduleList)
             {
                 // that's one way to resolve dependencies
-                var lib = File.ReadAllBytes(module);
+                var dllMod = LoadModule(module);
+
+                if (dllMod is not null)
+                {
+                    modules.Add(dllMod);
+                    Program.Log($"Successfully enabled {dllMod.Name}...");
+                }
+            }
+
+            Program.Log($"Success enabling all modules! Building method lists...");
+
+            // now we hash the lists of enabled modules for server & client processors
+            HashModules();
+            // any module editing its isEnabled property during runtime will have to HashModules!!!!
+        }
+
+        public static Type LoadModule(string path)
+        {
+            try
+            {
+                var lib = File.ReadAllBytes(path);
                 var dll = Assembly.Load(lib);
 
                 var moduleTypes = dll.GetTypes();
@@ -62,26 +91,57 @@ namespace DeltaProxy
                 // we consider main class to be one containing "OnEnable" method. Thus, it has to be implemented by ALL modules.
                 Type mainClass = moduleTypes.FirstOrDefault((z) => z.GetMethods().Any((x) => x.Name == "OnEnable"));
 
-                if (mainClass is null) { Program.Log($"Failure loading {Path.GetFileName(module)}. Couldn't find main class."); continue; }
+                if (mainClass is null) { Program.Log($"Failure loading {Path.GetFileName(path)}. Couldn't find main class."); return null; }
 
                 // the method MUST be public static
                 var mainMethod = mainClass.GetMethod("OnEnable", BindingFlags.Static | BindingFlags.Public);
 
-                if (mainMethod is null) { Program.Log($"Failure loading {Path.GetFileName(module)}. Couldn't find public static OnEnable method."); continue; }
+                if (mainMethod is null) { Program.Log($"Failure loading {Path.GetFileName(path)}. Couldn't find public static OnEnable method."); return null; }
 
                 // we enable ALL modules, regardless of whether or not they wish to be enabled, to init configs and databases
                 mainMethod.Invoke(null, null);
 
-                modules.Add(mainClass);
-
-                Program.Log($"Successfully enabled {mainClass.Name}...");
+                return mainClass;
+            } catch (Exception ex)
+            {
+                Program.Log($"Fatal exception while loading module from {path}! {ex.Message} {ex.Source}");
+                if (ex.InnerException is not null) Program.Log($"{ex.InnerException.Message} {ex.InnerException.StackTrace}");
             }
+            return null;
+        }
 
-            Program.Log($"Success enabling all modules! Building method lists...");
+        /// <summary>
+        /// Sets up the priorities for modules. ConnectionInfoHolderModule will always have a priority of 0
+        /// </summary>
+        private static void SetPrioritiesUp()
+        {
+            hashed_client = hashed_client.OrderBy((z) =>
+            {
+                return GetPriorityOfMethod(z, "CLIENT_PRIORITY");
+            }).ThenBy((x) =>
+            {
+                return x.Module.Name; // for the same priority modules, sort by module name
+            }).ToList();
 
-            // then we hash the lists of enabled modules for server & client processors
-            HashModules();
-            // any module editing its isEnabled property during runtime will have to HashModules!!!!
+            hashed_server = hashed_server.OrderBy((z) =>
+            {
+                return GetPriorityOfMethod(z, "SERVER_PRIORITY");
+            }).ThenBy((x) =>
+            {
+                return x.Module.Name; // for the same priority modules, sort by module name
+            }).ToList();
+        }
+
+        private static object GetPriorityOfMethod(MethodInfo z, string fieldName)
+        {
+            var module = z.DeclaringType;
+
+            var priority = module.GetField(fieldName);
+            if (priority is null) { return int.MaxValue; } // if no priority, assume highest
+            var pValue = priority.GetValue(null);
+            if (pValue is null) { return int.MaxValue; } // same if no value is defined
+
+            return (int)pValue;
         }
 
         private static Assembly? CurrentDomain_AssemblyResolve(object? sender, ResolveEventArgs args)
@@ -98,7 +158,8 @@ namespace DeltaProxy
         public static bool ProcessServerMessage(ConnectionInfo info, string msg)
         {
             // making sure the msg doesn't contain @time timestamp like @time=2023-07-09T13:25:37.688Z
-            if (msg.StartsWith("@time=")) { msg = msg.SplitMessage().ToArray().Join(1); }
+            string timeString = null;
+            if (msg.StartsWith("@time=")) { timeString = msg.SplitMessage()[0]; msg = msg.SplitMessage().ToArray().Join(1); }
 
             foreach (var method in hashed_server)
             {
@@ -106,8 +167,13 @@ namespace DeltaProxy
 
                 // some modules can prevent server messages if they return false boolean.
                 if (executionResult is null) continue;
+                // also check for remote server block - if one is present, halt execution
+                if (info.RemoteBlockServer) { info.RemoteBlockServer = false; return false; }
                 if (executionResult.HasValue && !executionResult.Value) return false;
             }
+
+            // return msg the time string
+            if (!string.IsNullOrEmpty(timeString)) { msg = $"{timeString} {msg}"; }
 
             return true;
         }
@@ -126,8 +192,10 @@ namespace DeltaProxy
                 {
                     bool executionResult = (bool)method.Invoke(null, new object[] { info, msg });
 
-                    if (!executionResult) Program.Log($"{method.DeclaringType.Name} -> {executionResult}");
+                    //if (!executionResult) Program.Log($"{method.DeclaringType.Name} -> {executionResult}");
 
+                    // first check for remote server block - if one is present, halt execution
+                    if (info.RemoteBlockClient) { info.RemoteBlockClient = false; return false; }
                     if (!executionResult) return false; // halt execution as requested by a module
                 } catch (Exception ex)
                 {
@@ -155,6 +223,9 @@ namespace DeltaProxy
                         if (((int)activity & (int)Active.Server) != 0) hashed_server.Add(tuple.Item2[0]);
                         if (((int)activity & (int)Active.Client) != 0) hashed_client.Add(tuple.Item2[1]);
                     }
+
+                    // then we sort methods based on their priorities. It requires CLIENT_PRIORITY and SERVER_PRIORITY integers to be defined. Modules with LOWEST numbers will be ran first.
+                    SetPrioritiesUp();
                 }
             }
         }

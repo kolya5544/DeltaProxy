@@ -29,7 +29,7 @@ namespace DeltaProxy.modules
             if (info.Nickname is not null && info.IP is not null && msgSplit.Assert("NICK", 0) && !info.ChangedNickname) // expecting first NICK
             {
                 Database.AllowedEntry? ticket;
-                lock (db.allowedList) ticket = db.allowedList.LastOrDefault((z) => z.Nickname == info.Nickname && z.IPAddress == info.IP);
+                lock (db.allowedList) ticket = db.allowedList.LastOrDefault((z) => z.Nickname == info.Nickname && (cfg.IgnoreIP || z.IPAddress == info.IP));
                 if (ticket is null) // unfortunately no ticket. Create one and disconnect the user
                 {
                     IssueNewTicket(info);
@@ -86,6 +86,7 @@ namespace DeltaProxy.modules
         {
             public bool isEnabled = false;
             public string KillMessage = "Your connection is being scanned... Please reconnect!";
+            public bool IgnoreIP = true;
         }
     }
 }

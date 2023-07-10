@@ -19,7 +19,7 @@ namespace DeltaProxy
         public static bool Assert(this List<string> splet, string cmp, int index)
         {
             if (splet.Count <= index) return false;
-            return splet[index].Equals(cmp, StringComparison.OrdinalIgnoreCase);
+            return splet[index].Trim(':').Equals(cmp.Trim(':'), StringComparison.OrdinalIgnoreCase);
         }
 
         public static bool AssertCount(this List<string> splet, int count, bool orMore = false)
@@ -34,10 +34,10 @@ namespace DeltaProxy
             return message.Substring(index).Trim(':');
         }
 
-        public static string Join(this string[] arr, int start, char delim = ' ')
+        public static string Join(this string[] arr, int start, char delim = ' ', int length = -1)
         {
             string res = "";
-            for (int i = start; i < arr.Length; i++)
+            for (int i = start; i < (length == -1 ? arr.Length : Math.Min(arr.Length, length)); i++)
             {
                 res += arr[i] + delim;
             }
@@ -46,14 +46,37 @@ namespace DeltaProxy
 
         public static void SendClientMessage(this ConnectionInfo sw, string message, bool flush = true)
         {
-            sw.clientQueue.Add($":{Program.cfg.serverHostname} {message}");
+            lock (sw.clientQueue) sw.clientQueue.Add($":{Program.cfg.serverHostname} {message}");
             if (flush) sw.FlushClientQueue();
         }
 
         public static void SendClientMessage(this ConnectionInfo sw, string sender, string receiver, string message, bool flush = true)
         {
-            sw.clientQueue.Add($":{sender}!proxy@{Program.cfg.serverHostname} NOTICE {receiver} :{message}");
+            lock (sw.clientQueue) sw.clientQueue.Add($":{sender}!proxy@{Program.cfg.serverHostname} NOTICE {receiver} :{message}");
             if (flush) sw.FlushClientQueue();
+        }
+
+        public static bool AssertCorrectPerson(this List<string> id, ConnectionInfo info)
+        {
+            if (!id.AssertCount(1, true)) return false;
+
+            var tuple = id[0].ParseIdentifier();
+
+            if (tuple.Item1 == info.Nickname && info.Username.StartsWith(tuple.Item2) && tuple.Item3 == info.VHost)
+            {
+                return true;
+            }
+            return false;
+        }
+
+        public static bool HasChannel(this string joinSequence, string channel)
+        {
+            return joinSequence.Trim(':').Split(',').Any((z) => z == channel);
+        }
+
+        public static void FlushClientQueueAsync(this ConnectionInfo sw)
+        {
+            new Thread(() => sw.FlushClientQueue()).Start();
         }
 
         public static Tuple<string, string, string> ParseIdentifier(this string id)
@@ -63,6 +86,13 @@ namespace DeltaProxy
             var tuple = new Tuple<string, string, string>(final.First(), final.Last(), splet.Last());
             return tuple;
         }
+
+        public static string GetTimeString(ConnectionInfo info)
+        {
+            var t = UnixMS();
+            return info.capabilities.Contains("server-time") ? $"@time={DateTimeOffset.FromUnixTimeMilliseconds(t).ToString("yyyy-MM-ddTHH:mm:ss.fffZ")} " : "";
+        }
+
 
         public static string ToDuration(this long? span)
         {
@@ -104,6 +134,30 @@ namespace DeltaProxy
         public static long UnixMS()
         {
             return DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        }
+
+        public static string Clamp(this string c, int length, int lines = 99999, bool threedots = true)
+        {
+            string[] larr = c.Split('\n');
+
+            if (c.Length <= length && larr.Length <= lines) return c;
+
+            string ps = c;
+
+            if (larr.Length > lines)
+            {
+                ps = larr.Join(0, '\n', lines);
+            }
+
+            return ps.Substring(0, Math.Min(length, ps.Length)) + (threedots ? "..." : "");
+        }
+
+        public static string FileSize(long v)
+        {
+            if (v >= 1024 * 1024 * 1024) return $"{Math.Round(v / (1024 * 1024 * 1024d), 2)} GB";
+            if (v >= 1024 * 1024) return $"{Math.Round(v / (1024 * 1024d), 2)} MB";
+            if (v >= 1024) return $"{Math.Round(v / 1024d, 2)} KB";
+            return $"{v} B";
         }
     }
 }

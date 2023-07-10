@@ -1,5 +1,6 @@
 ﻿using DeltaProxy;
 using System.Net.Sockets;
+using System.Security.Cryptography.X509Certificates;
 
 namespace DeltaProxy.modules
 {
@@ -11,6 +12,9 @@ namespace DeltaProxy.modules
     /// </summary>
     public class ConnectionInfoHolderModule
     {
+        public static int CLIENT_PRIORITY = 0; // we want connectioninfo module to catch everything first-hand
+        public static int SERVER_PRIORITY = 0;
+
         public static List<ConnectionInfo> connectedUsers = new List<ConnectionInfo>();
         public static ModuleConfig cfg;
         public static Database db;
@@ -72,8 +76,19 @@ namespace DeltaProxy.modules
                     TimeSpentTotal = IRCExtensions.UnixMS() - info.ConnectionTimestamp * 1000,
                     Realname = info.Realname
                 };
-                connectedUsers.Add(info);
             }
+            if (info.Nickname is not null && info.Username is not null && !info.init)
+            {
+                info.init = true;
+                lock (connectedUsers) connectedUsers.Add(info); // keep track of that
+            }
+
+            if (msgSplit.Assert("CAP", 0) && msgSplit.Assert("REQ", 1))
+            {
+                string capabilities = msg.GetLongString();
+                info.capabilities = capabilities.Split(' ').ToList();
+            }
+
             return true;
         }
 
@@ -109,6 +124,8 @@ namespace DeltaProxy.modules
             public string VHost;
             public string Realname;
 
+            public bool init = false;
+
             public TcpClient Client;
             public StreamWriter Writer; // not recommended to use
             public Stream Stream;
@@ -124,6 +141,13 @@ namespace DeltaProxy.modules
 
             public List<string> serverQueue = new List<string>();
             public List<string> clientQueue = new List<string>();
+
+            public bool RemoteBlockServer = false; // you can set these to remotely block further execution of code on SERVER module side
+            public bool RemoteBlockClient = false; // or CLIENT module side. This flag is being reset after every message received.
+
+            public List<string> capabilities;
+
+            public X509Certificate? clientCert;
 
             public void FlushServerQueue()
             {

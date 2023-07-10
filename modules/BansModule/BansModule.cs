@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using static DeltaProxy.modules.BansModule;
 using static DeltaProxy.modules.ConnectionInfoHolderModule;
 
 namespace DeltaProxy.modules
@@ -14,6 +15,9 @@ namespace DeltaProxy.modules
     /// </summary>
     public class BansModule
     {
+        public static int CLIENT_PRIORITY = 1; // bans module has to have access to data before other modules to prevent other modules from processing banned users' data
+        public static int SERVER_PRIORITY = 1;
+
         public static ModuleConfig cfg;
         public static Database db;
         public static List<Disconnect> disconnects = new(); // holds a list of disconnect reasons
@@ -36,6 +40,7 @@ namespace DeltaProxy.modules
                 string username = subject.Item2;
                 string vhost = subject.Item3;
 
+                // first and foremost
                 lock (connectedUsers) connectedUsers.RemoveAll((z) => z.Nickname == nickname);
 
                 string quitReason = msgSplit.ToArray().Join(2).Trim(':');
@@ -98,6 +103,17 @@ namespace DeltaProxy.modules
         public static void ProperDisconnect(ConnectionInfo info, string reason = "Disconnected by DeltaProxy.")
         {
             var disconnectID = CreateDisconnect(info.Nickname, reason);
+
+            // we should alert other modules of someone's KICK!! they are NOT going to get the message otherwise, because of BansModule returning FALSE in server processor!!
+            lock (ModuleHandler.hashed_server)
+            {
+                foreach (var z in ModuleHandler.hashed_server)
+                {
+                    string fakeQuitMessage = $":{info.Nickname}!{info.Username}@{info.VHost} QUIT :DeltaProxy: {reason}"; // we'll have to create a fake quit message for other module to process
+                    bool? executionResult = (bool?)z.Invoke(null, new object[] { info, fakeQuitMessage });
+                    if (executionResult.HasValue && !executionResult.Value) { info.RemoteBlockServer = true; break; } // if a module decides so, we should halt execution
+                }
+            }
 
             lock (info.serverQueue) info.serverQueue.Add($"QUIT :DeltaProxy Forced Disconnect #{disconnectID}");
             info.FlushServerQueue();

@@ -44,6 +44,8 @@ namespace DeltaProxy.modules
                     info.SendClientMessage("DeltaProxy", info.Nickname, $"[A] = /admin select [module] -> Select a module");
                     info.SendClientMessage("DeltaProxy", info.Nickname, $"[A] = /admin enable -> Enable selected module");
                     info.SendClientMessage("DeltaProxy", info.Nickname, $"[A] = /admin disable -> Disable selected module");
+                    info.SendClientMessage("DeltaProxy", info.Nickname, $"[A] = /admin reload -> Reload selected module (risky!)");
+                    info.SendClientMessage("DeltaProxy", info.Nickname, $"[A] = /admin load [module] -> Load a new module (risky!)");
                     info.SendClientMessage("DeltaProxy", info.Nickname, $"[A] = /admin cfg -> See all possible configuration for selected module");
                     info.SendClientMessage("DeltaProxy", info.Nickname, $"[A] = /admin cfg [name] [value] -> Change configuration value");
                 }
@@ -64,6 +66,10 @@ namespace DeltaProxy.modules
                     else if (msgSplit.Assert("disable", 1))
                     {
                         ToggleModule(info, ac, false);
+                    }
+                    else if (msgSplit.Assert("reload", 1))
+                    {
+                        ReloadModule(info, ac);
                     }
                     else if (msgSplit.Assert("cfg", 1))
                     {
@@ -107,6 +113,15 @@ namespace DeltaProxy.modules
                         ac.ModuleChosen = module;
                         info.SendClientMessage("DeltaProxy", info.Nickname, $"[A] = Successfully chosen module '{ac.ModuleChosen.Name}'!");
                     }
+                    if (msgSplit.Assert("load", 1))
+                    {
+                        var moduleName = msgSplit[2];
+                        
+                        if (File.Exists($"modules/{moduleName}.dll"))
+                        {
+                            LoadModule(info, moduleName);
+                        }
+                    }
                 }
                 if (msgSplit.AssertCount(4, true)) // /admin subcmd arg arg ...
                 {
@@ -148,6 +163,57 @@ namespace DeltaProxy.modules
             }
 
             return true;
+        }
+
+        private static void LoadModule(ConnectionInfo info, string moduleName)
+        {
+            // let's first try to load the assembly
+            var newModule = ModuleHandler.LoadModule($"modules/{moduleName}.dll");
+
+            if (newModule is not null)
+            {
+                ModuleHandler.modules.Add(newModule);
+                ModuleHandler.HashModules();
+
+                Program.Log($"Successfully enabled {newModule.Name}...");
+
+                info.SendClientMessage("DeltaProxy", info.Nickname, $"[A] = Successfully enabled module '{newModule.Name}'!");
+            } else
+            {
+                info.SendClientMessage("DeltaProxy", info.Nickname, $"[A] = Fatal error encountered while trying to enable module '{newModule.Name}'!");
+            }
+        }
+
+        private static void ReloadModule(ConnectionInfo info, AdminChoice ac)
+        {
+            if (ac.ModuleChosen is null)
+            {
+                info.SendClientMessage("DeltaProxy", info.Nickname, cfg.error_no_module); return;
+            }
+
+            info.SendClientMessage("DeltaProxy", info.Nickname, $"[A] = Attempting to disable '{ac.ModuleChosen.Name}'...");
+            // we will first try to disable the module
+
+            // for that, we first want to make sure method lists don't call it while it's off
+            lock (ModuleHandler.hashed_client) ModuleHandler.hashed_client.RemoveAll((z) => z.DeclaringType.Name == ac.ModuleChosen.Name);
+            lock (ModuleHandler.hashed_server) ModuleHandler.hashed_server.RemoveAll((z) => z.DeclaringType.Name == ac.ModuleChosen.Name);
+
+            // then we'll call OnDisable if it's implemented.
+            var disableMethod = ac.ModuleChosen.GetMethod("OnDisable", BindingFlags.Static | BindingFlags.Public);
+            if (disableMethod is not null) disableMethod.Invoke(null, null);
+
+            ModuleHandler.modules.Remove(ac.ModuleChosen);
+
+            info.SendClientMessage("DeltaProxy", info.Nickname, $"[A] = Disabled '{ac.ModuleChosen.Name}'.");
+
+            // then we'll try to load the assembly again
+            var mainClass = ModuleHandler.LoadModule($"modules/{ac.ModuleChosen.Name}.dll");
+
+            ModuleHandler.modules.Add(mainClass);
+            ModuleHandler.HashModules();
+            ac.ModuleChosen = mainClass;
+
+            // if it doesn't work, well too bad.
         }
 
         public static void SaveConfig(Type module)

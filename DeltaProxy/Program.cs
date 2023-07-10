@@ -68,13 +68,17 @@ namespace DeltaProxy
             int authedTimeout = 120000;
 
             string ip_address = ((IPEndPoint)client.Client.RemoteEndPoint).Address.ToString();
-            string hostname = Dns.GetHostByAddress(ip_address).HostName;
+            string hostname;
+            try
+            {
+                hostname = Dns.GetHostEntry(ip_address).HostName;
+            } catch { hostname = ip_address; }
 
             Stream? client_stream = null;
             Stream? server_stream = null;
             TcpClient server_tcp;
 
-            Console.WriteLine($"New connection {ip_address} & {hostname}");
+            Console.WriteLine($"New connection from {ip_address} & {hostname}");
             ConnectionInfo info = new ConnectionInfo();
             info.IP = ip_address;
             info.ConnectionTimestamp = IRCExtensions.Unix();
@@ -82,15 +86,24 @@ namespace DeltaProxy
             try
             {
                 // initialize the client
+                X509Certificate remoteCertificate = null;
                 if (isSSL)
                 {
-                    SslStream sslStream = new SslStream(client.GetStream(), false);
-                    sslStream.AuthenticateAsServer(serverCert, clientCertificateRequired: false, checkCertificateRevocation: true);
+                    SslStream sslStream = new SslStream(client.GetStream(), false, VerifyClientCertificate);
+                    sslStream.AuthenticateAsServer(serverCert, clientCertificateRequired: true, checkCertificateRevocation: false);
+                    remoteCertificate = sslStream.RemoteCertificate;
 
                     client_stream = sslStream;
                 } else
                 {
                     client_stream = client.GetStream();
+                }
+
+                X509CertificateCollection xes = null;
+                if (remoteCertificate is not null)
+                {
+                    xes = new X509CertificateCollection() { remoteCertificate };
+                    info.clientCert = remoteCertificate;
                 }
 
                 client_stream.ReadTimeout = defaultTimeout;
@@ -104,7 +117,14 @@ namespace DeltaProxy
                 {
                     server_tcp = new TcpClient(cfg.serverIP, cfg.serverPortSSL);
                     SslStream sslStream = new SslStream(server_tcp.GetStream(), false);
-                    sslStream.AuthenticateAsClient(cfg.serverHostname);
+
+                    if (remoteCertificate is null)
+                    {
+                        sslStream.AuthenticateAsClient(cfg.serverHostname);
+                    } else
+                    {
+                        sslStream.AuthenticateAsClient(cfg.serverHostname, xes, checkCertificateRevocation: false);
+                    }
 
                     server_stream = sslStream;
                 } else
@@ -141,7 +161,7 @@ namespace DeltaProxy
                         {
                             var cmd = client_sr.ReadLine();
                             if (string.IsNullOrEmpty(cmd)) throw new Exception("Broken pipe");
-                            Log($"<< {cmd}");
+                            //Log($"<< {cmd}");
 
                             // check all CLIENT-side modules
                             var moduleResponse = ModuleHandler.ProcessClientMessage(info, cmd);
@@ -164,7 +184,7 @@ namespace DeltaProxy
                     var cmd = server_sr.ReadLine();
                     if (string.IsNullOrEmpty(cmd)) throw new Exception("Broken pipe");
                     if (clientException is not null) throw clientException;
-                    Log($">> {cmd}");
+                    //Log($">> {cmd}");
 
                     // check all SERVER-side modules
                     var moduleResponse = ModuleHandler.ProcessServerMessage(info, cmd);
@@ -184,12 +204,19 @@ namespace DeltaProxy
             } catch (Exception ex)
             {
                 Log($"{ex.Message} {ex.StackTrace}");
+                if (ex.InnerException is not null) Log($"{ex.InnerException.Message} {ex.InnerException.StackTrace}");
             } finally
             {
+                lock (connectedUsers) connectedUsers.Remove(info);
                 if (client_stream is not null) client_stream.Close();
                 if (server_stream is not null) server_stream.Close();
                 client.Close();
             }
+        }
+
+        private static bool VerifyClientCertificate(object sender, X509Certificate? certificate, X509Chain? chain, SslPolicyErrors sslPolicyErrors)
+        {
+            return true;
         }
 
         public static void Log(string msg)

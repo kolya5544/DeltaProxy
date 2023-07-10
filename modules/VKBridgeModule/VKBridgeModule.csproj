@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\deltaproxy\DeltaProxy.csproj" />
+    <ProjectReference Include="..\BansModule\BansModule.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="dotVK">
+      <HintPath>dotVK.dll</HintPath>
+    </Reference>
+    <Reference Include="EmbedIO">
+      <HintPath>EmbedIO.dll</HintPath>
+    </Reference>
+    <Reference Include="Swan.Lite">
+      <HintPath>Swan.Lite.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
+  <Target Name="PostBuild" AfterTargets="PostBuildEvent">
+    <Exec Command="echo f | xcopy /f /y $(ProjectDir)$(OutDir)dotVK.dll $(ProjectDir)..\..\DeltaProxy\$(OutDir)deps\dotVK.dll&#xD;&#xA;echo f | xcopy /f /y $(ProjectDir)$(OutDir)EmbedIO.dll $(ProjectDir)..\..\DeltaProxy\$(OutDir)deps\EmbedIO.dll&#xD;&#xA;echo f | xcopy /f /y $(ProjectDir)$(OutDir)Swan.Lite.dll $(ProjectDir)..\..\DeltaProxy\$(OutDir)deps\Swan.Lite.dll&#xD;&#xA;echo f | xcopy /f /y $(ProjectDir)$(OutDir)$(ProjectName).dll $(ProjectDir)..\..\DeltaProxy\$(OutDir)modules\$(ProjectName).dll" />
+  </Target>
+
+</Project>
