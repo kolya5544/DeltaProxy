@@ -31,7 +31,8 @@ namespace DeltaProxy
         {
             int index = message.IndexOf(':');
             if (index == -1) return "";
-            return message.Substring(index).Trim(':');
+            string preReady = message.Substring(index); if (preReady.StartsWith(":")) preReady = preReady.Substring(1);
+            return preReady;
         }
 
         public static string Join(this string[] arr, int start, char delim = ' ', int length = -1)
@@ -42,6 +43,11 @@ namespace DeltaProxy
                 res += arr[i] + delim;
             }
             return res.TrimEnd(delim);
+        }
+
+        public static void SendPostClientMessage(this ConnectionInfo sw, string message)
+        {
+            lock (sw.postClientQueue) sw.postClientQueue.Add($":{Program.cfg.serverHostname} {message}");
         }
 
         public static void SendClientMessage(this ConnectionInfo sw, string message, bool flush = true)
@@ -93,6 +99,10 @@ namespace DeltaProxy
             return info.capabilities.Contains("server-time") ? $"@time={DateTimeOffset.FromUnixTimeMilliseconds(t).ToString("yyyy-MM-ddTHH:mm:ss.fffZ")} " : "";
         }
 
+        public static string GetTimeString(ConnectionInfo info, long timestampMS)
+        {
+            return info.capabilities.Contains("server-time") ? $"@time={DateTimeOffset.FromUnixTimeMilliseconds(timestampMS).ToString("yyyy-MM-ddTHH:mm:ss.fffZ")} " : "";
+        }
 
         public static string ToDuration(this long? span)
         {

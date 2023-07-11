@@ -10,6 +10,7 @@ namespace DeltaProxy
     public abstract class DatabaseBase<T> where T : DatabaseBase<T>, new()
     {
         private string filename;
+        public object lockObject = new object();
 
         public static T LoadDatabase(string filepath)
         {
@@ -30,7 +31,7 @@ namespace DeltaProxy
 
         public void SaveDatabase()
         {
-            lock (this)
+            lock (lockObject)
             {
                 var contents = JsonConvert.SerializeObject(this, Formatting.Indented);
                 if (File.Exists($"db/{filename}")) { File.Copy($"db/{filename}", $"db/{filename}.backup", true); }

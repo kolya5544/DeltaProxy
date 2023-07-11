@@ -1,6 +1,7 @@
 ﻿using DeltaProxy.modules;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Net.NetworkInformation;
 using System.Reflection;
@@ -52,7 +53,7 @@ namespace DeltaProxy
             var depsList = Directory.EnumerateFiles("deps", "*.dll").ToList();
             foreach (var dependency in depsList)
             {
-                // load dependency
+                // load dependencies
                 var lib = File.ReadAllBytes(dependency);
                 var dep = Assembly.Load(lib);
             }
@@ -68,8 +69,18 @@ namespace DeltaProxy
                 if (dllMod is not null)
                 {
                     modules.Add(dllMod);
-                    Program.Log($"Successfully enabled {dllMod.Name}...");
                 }
+            }
+
+            modules = modules.OrderBy(m => GetLoadPriority(m)).ThenBy(m => m.Name).ToList();
+
+            foreach (var module in modules)
+            {
+                var enableMethod = GetEnableMethod(module);
+
+                enableMethod.Invoke(null, null); // enable all modules in their defined order
+
+                Program.Log($"Module {module.Name} enabled successfully!");
             }
 
             Program.Log($"Success enabling all modules! Building method lists...");
@@ -77,6 +88,26 @@ namespace DeltaProxy
             // now we hash the lists of enabled modules for server & client processors
             HashModules();
             // any module editing its isEnabled property during runtime will have to HashModules!!!!
+        }
+
+        public static int GetLoadPriority(Type module)
+        {
+            var loadPriority = module.GetField("LOAD_PRIORITY");
+            if (loadPriority is null) return int.MaxValue;
+            var priorityVal = (int?)loadPriority.GetValue(null);
+            if (priorityVal is null) return int.MaxValue;
+
+            return priorityVal.Value;
+        }
+
+        public static MethodInfo GetEnableMethod(Type module)
+        {
+            // the method MUST be public static
+            var mainMethod = module.GetMethod("OnEnable", BindingFlags.Static | BindingFlags.Public);
+
+            if (mainMethod is null) { Program.Log($"Failure loading {module.Name}. Couldn't find public static OnEnable method."); return null; }
+
+            return mainMethod;
         }
 
         public static Type LoadModule(string path)
@@ -92,14 +123,6 @@ namespace DeltaProxy
                 Type mainClass = moduleTypes.FirstOrDefault((z) => z.GetMethods().Any((x) => x.Name == "OnEnable"));
 
                 if (mainClass is null) { Program.Log($"Failure loading {Path.GetFileName(path)}. Couldn't find main class."); return null; }
-
-                // the method MUST be public static
-                var mainMethod = mainClass.GetMethod("OnEnable", BindingFlags.Static | BindingFlags.Public);
-
-                if (mainMethod is null) { Program.Log($"Failure loading {Path.GetFileName(path)}. Couldn't find public static OnEnable method."); return null; }
-
-                // we enable ALL modules, regardless of whether or not they wish to be enabled, to init configs and databases
-                mainMethod.Invoke(null, null);
 
                 return mainClass;
             } catch (Exception ex)
@@ -117,7 +140,7 @@ namespace DeltaProxy
         {
             lock (modules) modules = modules.OrderBy((z) => z.Name).ToList();
 
-            hashed_client = hashed_client.OrderBy((z) =>
+            lock (hashed_client) hashed_client = hashed_client.OrderBy((z) =>
             {
                 return GetPriorityOfMethod(z, "CLIENT_PRIORITY");
             }).ThenBy((x) =>
@@ -125,7 +148,7 @@ namespace DeltaProxy
                 return x.Module.Name; // for the same priority modules, sort by module name
             }).ToList();
 
-            hashed_server = hashed_server.OrderBy((z) =>
+            lock (hashed_server) hashed_server = hashed_server.OrderBy((z) =>
             {
                 return GetPriorityOfMethod(z, "SERVER_PRIORITY");
             }).ThenBy((x) =>
@@ -134,7 +157,7 @@ namespace DeltaProxy
             }).ToList();
         }
 
-        private static object GetPriorityOfMethod(MethodInfo z, string fieldName)
+        private static int GetPriorityOfMethod(MethodInfo z, string fieldName)
         {
             var module = z.DeclaringType;
 
@@ -159,23 +182,26 @@ namespace DeltaProxy
         /// <param name="msg">Message sent by server</param>
         public static bool ProcessServerMessage(ConnectionInfo info, string msg)
         {
-            // making sure the msg doesn't contain @time timestamp like @time=2023-07-09T13:25:37.688Z
-            string timeString = null;
-            if (msg.StartsWith("@time=")) { timeString = msg.SplitMessage()[0]; msg = msg.SplitMessage().ToArray().Join(1); }
+            // making sure the msg doesn't contain @ prefixes like @time=2023-07-09T13:25:37.688Z
+            string prefix = null;
+            if (msg.StartsWith("@")) { prefix = msg.SplitMessage()[0]; msg = msg.SplitMessage().ToArray().Join(1); }
 
-            foreach (var method in hashed_server)
+            lock (hashed_server)
             {
-                bool? executionResult = (bool?)method.Invoke(null, new object[] { info, msg });
+                foreach (var method in hashed_server)
+                {
+                    bool? executionResult = (bool?)method.Invoke(null, new object[] { info, msg });
 
-                // some modules can prevent server messages if they return false boolean.
-                if (executionResult is null) continue;
-                // also check for remote server block - if one is present, halt execution
-                if (info.RemoteBlockServer) { info.RemoteBlockServer = false; return false; }
-                if (executionResult.HasValue && !executionResult.Value) return false;
+                    // some modules can prevent server messages if they return false boolean.
+                    if (executionResult is null) continue;
+                    // also check for remote server block - if one is present, halt execution
+                    if (info.RemoteBlockServer) { info.RemoteBlockServer = false; return false; }
+                    if (executionResult.HasValue && !executionResult.Value) return false;
+                }
             }
 
-            // return msg the time string
-            if (!string.IsNullOrEmpty(timeString)) { msg = $"{timeString} {msg}"; }
+            // return msg the prefix string
+            if (!string.IsNullOrEmpty(prefix)) { msg = $"{prefix} {msg}"; }
 
             return true;
         }
@@ -188,20 +214,22 @@ namespace DeltaProxy
         /// <returns>Whether or not the message should be forwarded to server.</returns>
         public static bool ProcessClientMessage(ConnectionInfo info, string msg)
         {
-            foreach (var method in hashed_client)
+            lock (hashed_client)
             {
-                try
+                foreach (var method in hashed_client)
                 {
-                    bool executionResult = (bool)method.Invoke(null, new object[] { info, msg });
+                    try
+                    {
+                        bool executionResult = (bool)method.Invoke(null, new object[] { info, msg });
 
-                    //if (!executionResult) Program.Log($"{method.DeclaringType.Name} -> {executionResult}");
-
-                    // first check for remote server block - if one is present, halt execution
-                    if (info.RemoteBlockClient) { info.RemoteBlockClient = false; return false; }
-                    if (!executionResult) return false; // halt execution as requested by a module
-                } catch (Exception ex)
-                {
-                    Program.Log($"Fatal Exception by module {method.DeclaringType.Name}: {ex.Message} {ex.StackTrace}");
+                        // first check for remote client block - if one is present, halt execution
+                        if (info.RemoteBlockClient) { info.RemoteBlockClient = false; return false; }
+                        if (!executionResult) return false; // halt execution as requested by a module
+                    }
+                    catch (Exception ex)
+                    {
+                        Program.Log($"Fatal Exception by module {method.DeclaringType.Name}: {ex.Message} {ex.StackTrace}");
+                    }
                 }
             }
 
@@ -217,6 +245,9 @@ namespace DeltaProxy
             {
                 lock (hashed_client)
                 {
+                    hashed_client.Clear();
+                    hashed_server.Clear();
+
                     foreach (var moduleType in modules)
                     {
                         var tuple = IsModuleActive(moduleType);
@@ -268,7 +299,7 @@ namespace DeltaProxy
             if (cfgField is null) { return true; } // if no cfg is defined, call the module
             var cfgInstance = cfgField.GetValue(null);
             var isEnabledField = cfgField.FieldType.GetField("isEnabled");
-            if (isEnabledField is null) { return true; } // if no isEnabled field is present, call the module
+            if (isEnabledField is null || cfgInstance is null) { return true; } // if no isEnabled field is present, call the module
             if (isEnabledField.FieldType == typeof(bool))
             {
                 var isEnabled = (bool)isEnabledField.GetValue(cfgInstance);

@@ -4,10 +4,10 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using static DeltaProxy.modules.BansModule;
+using static DeltaProxy.modules.Bans.BansModule;
 using static DeltaProxy.modules.ConnectionInfoHolderModule;
 
-namespace DeltaProxy.modules
+namespace DeltaProxy.modules.Bans
 {
     /// <summary>
     /// This is a CLIENT-side module responsible for managing bans and mutes. This module can be disabled, however it is NOT recommended, since other modules rely on it.
@@ -69,10 +69,10 @@ namespace DeltaProxy.modules
             if (info.Nickname is not null && info.IP is not null && msgSplit.Assert("NICK", 0) && !info.ChangedNickname) // expecting first NICK
             {
                 // removing old bans
-                lock (db.bans) db.bans.RemoveAll((z) => IRCExtensions.Unix() - z.Issued - z.Duration >= 0);
+                lock (db.lockObject) db.bans.RemoveAll((z) => IRCExtensions.Unix() - z.Issued - z.Duration >= 0);
 
                 Punishment ban;
-                lock (db.bans) ban = db.bans.FirstOrDefault((z) => z.IP == info.IP);
+                lock (db.lockObject) ban = db.bans.FirstOrDefault((z) => z.IP == info.IP);
 
                 if (ban is not null)
                 {
@@ -85,10 +85,10 @@ namespace DeltaProxy.modules
             if (msgSplit.Assert("PRIVMSG", 0) && msgSplit.AssertCount(2, true))
             {
                 // removing old mutes
-                lock (db.mutes) db.mutes.RemoveAll((z) => IRCExtensions.Unix() - z.Issued - z.Duration >= 0);
+                lock (db.lockObject) db.mutes.RemoveAll((z) => IRCExtensions.Unix() - z.Issued - z.Duration >= 0);
 
                 Punishment mute;
-                lock (db.mutes) mute = db.mutes.FirstOrDefault((z) => z.IP == info.IP);
+                lock (db.lockObject) mute = db.mutes.FirstOrDefault((z) => z.IP == info.IP);
 
                 if (mute is not null)
                 {

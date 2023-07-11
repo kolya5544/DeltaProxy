@@ -8,10 +8,12 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using static DeltaProxy.modules.ConnectionInfoHolderModule;
-using static DeltaProxy.modules.BansModule;
-using static DeltaProxy.modules.WordBlacklistModule;
+using static DeltaProxy.modules.Bans.BansModule;
+using static DeltaProxy.modules.WordBlacklist.WordBlacklistModule;
+using DeltaProxy.modules.StaffAuth;
+using DeltaProxy.modules.Bans;
 
-namespace DeltaProxy.modules
+namespace DeltaProxy.modules.WordBlacklist
 {
     /// <summary>
     /// This CLIENT and SERVER-SIDE module monitors for usage of blacklisted words in different messages. Use /blacklist as an admin to get more help.
@@ -52,7 +54,7 @@ namespace DeltaProxy.modules
 
                 if (msgSplit.AssertCount(1))
                 {
-                    lock (db.patterns) info.SendClientMessage("DeltaProxy", info.Nickname, $"BL - There are a total of {db.patterns.Count} substrings to match.");
+                    lock (db.lockObject) info.SendClientMessage("DeltaProxy", info.Nickname, $"BL - There are a total of {db.patterns.Count} substrings to match.");
                     info.SendClientMessage("DeltaProxy", info.Nickname, $"BL - You can use next subcommands: help, add, remove, list.");
                 }
                 else if (msgSplit.AssertCount(2))
@@ -67,7 +69,7 @@ namespace DeltaProxy.modules
                     else if (msgSplit.Assert("list", 1))
                     {
                         List<string> messages = new List<string>();
-                        lock (db.patterns) db.patterns.ForEach((z) => { messages.Add($"BL - \"{z.entry}\", ACT: {z.action}, DUR: {(z.duration is null ? "eternal" : $"{z.duration} seconds ({z.duration.ToDuration()})")}{(z.entry.StartsWith("/") ? " (RegEx: Yes)" : "")}"); });
+                        lock (db.lockObject) db.patterns.ForEach((z) => { messages.Add($"BL - \"{z.entry}\", ACT: {z.action}, DUR: {(z.duration is null ? "eternal" : $"{z.duration} seconds ({z.duration.ToDuration()})")}{(z.entry.StartsWith("/") ? " (RegEx: Yes)" : "")}"); });
 
                         foreach (string s in messages)
                         {
@@ -81,7 +83,7 @@ namespace DeltaProxy.modules
                     {
                         string substring = msgSplit[2].Trim();
                         Database.Pattern pattern;
-                        lock (db.patterns) pattern = db.patterns.FirstOrDefault((z) => z.entry.Equals(substring, StringComparison.OrdinalIgnoreCase));
+                        lock (db.lockObject) pattern = db.patterns.FirstOrDefault((z) => z.entry.Equals(substring, StringComparison.OrdinalIgnoreCase));
                         if (pattern is null)
                         {
                             info.SendClientMessage("DeltaProxy", info.Nickname, $"BL - Entry not found!");
@@ -96,7 +98,7 @@ namespace DeltaProxy.modules
                     {
                         string substring = msgSplit[2].Trim();
                         Database.Pattern pattern;
-                        lock (db.patterns) pattern = db.patterns.FirstOrDefault((z) => z.entry.Equals(substring, StringComparison.OrdinalIgnoreCase));
+                        lock (db.lockObject) pattern = db.patterns.FirstOrDefault((z) => z.entry.Equals(substring, StringComparison.OrdinalIgnoreCase));
                         if (pattern is not null)
                         {
                             info.SendClientMessage("DeltaProxy", info.Nickname, $"BL - Entry already exists!");
@@ -104,7 +106,7 @@ namespace DeltaProxy.modules
                         else
                         {
                             pattern = new() { entry = substring, action = "ban", duration = 60 * 60 * 24, warnings = 0 };
-                            lock (db.patterns) db.patterns.Add(pattern);
+                            lock (db.lockObject) db.patterns.Add(pattern);
                             info.SendClientMessage("DeltaProxy", info.Nickname, $"BL - Added entry successfully!");
                         }
                     }
@@ -134,7 +136,7 @@ namespace DeltaProxy.modules
                         if (!allowedActions.Contains(action)) { info.SendClientMessage("DeltaProxy", info.Nickname, $"BL - Unknown action! Actions supported are: kick, mute, ban"); return false; }
 
                         Database.Pattern pattern;
-                        lock (db.patterns) pattern = db.patterns.FirstOrDefault((z) => z.entry.Equals(entry, StringComparison.OrdinalIgnoreCase));
+                        lock (db.lockObject) pattern = db.patterns.FirstOrDefault((z) => z.entry.Equals(entry, StringComparison.OrdinalIgnoreCase));
 
                         if (pattern is not null)
                         {
@@ -163,7 +165,7 @@ namespace DeltaProxy.modules
                             duration = durationInt,
                             warnings = warningsInt
                         };
-                        lock (db.patterns) db.patterns.Add(ptr);
+                        lock (db.lockObject) db.patterns.Add(ptr);
                         info.SendClientMessage("DeltaProxy", info.Nickname, $"BL - Added entry successfully!");
                     }
                 }
@@ -171,7 +173,7 @@ namespace DeltaProxy.modules
                 {
                     string substring = msgSplit.ToArray().Join(2);
                     Database.Pattern pattern;
-                    lock (db.patterns) pattern = db.patterns.FirstOrDefault((z) => z.entry.Equals(substring, StringComparison.OrdinalIgnoreCase));
+                    lock (db.lockObject) pattern = db.patterns.FirstOrDefault((z) => z.entry.Equals(substring, StringComparison.OrdinalIgnoreCase));
                     if (pattern is not null)
                     {
                         info.SendClientMessage("DeltaProxy", info.Nickname, $"BL - Entry already exists!");
@@ -179,7 +181,7 @@ namespace DeltaProxy.modules
                     else
                     {
                         pattern = new() { entry = substring, action = "ban", duration = 60 * 60 * 24, warnings = 0 };
-                        lock (db.patterns) db.patterns.Add(pattern);
+                        lock (db.lockObject) db.patterns.Add(pattern);
                         info.SendClientMessage("DeltaProxy", info.Nickname, $"BL - Added entry successfully!");
                     }
                 }
@@ -200,7 +202,7 @@ namespace DeltaProxy.modules
 
             // check if any patterns match
             Database.Pattern ptrn;
-            lock (db.patterns) ptrn = db.patterns.FirstOrDefault((z) => SanitizeCompare(content, z.entry));
+            lock (db.lockObject) ptrn = db.patterns.FirstOrDefault((z) => SanitizeCompare(content, z.entry));
             if (ptrn is null) return true;
             return CheckAction(info, ptrn);
         }
@@ -252,7 +254,7 @@ namespace DeltaProxy.modules
             else if (ptrn.action == "mute")
             {
                 var mute = new Punishment() { Duration = ptrn.duration, IP = info.IP, Issued = IRCExtensions.Unix() };
-                lock (BansModule.db.mutes) BansModule.db.mutes.Add(mute);
+                lock (BansModule.db.lockObject) BansModule.db.mutes.Add(mute);
 
                 info.SendClientMessage("DeltaProxy", info.Nickname, ReplacePlaceholders(info, ptrn, cfg.muteMessage));
                 BansModule.db.SaveDatabase();
@@ -260,7 +262,7 @@ namespace DeltaProxy.modules
             else if (ptrn.action == "ban")
             {
                 var ban = new Punishment() { Duration = ptrn.duration, IP = info.IP, Issued = IRCExtensions.Unix() };
-                lock (BansModule.db.bans) BansModule.db.bans.Add(ban);
+                lock (BansModule.db.lockObject) BansModule.db.bans.Add(ban);
 
                 info.SendClientMessage("DeltaProxy", info.Nickname, ReplacePlaceholders(info, ptrn, cfg.banMessage));
                 BansModule.ProperDisconnect(info, $"Banned for rules violation.");

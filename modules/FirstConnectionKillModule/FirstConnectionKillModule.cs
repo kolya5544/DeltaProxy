@@ -1,11 +1,12 @@
-﻿using System;
+﻿using DeltaProxy.modules.Bans;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using static DeltaProxy.modules.ConnectionInfoHolderModule;
 
-namespace DeltaProxy.modules
+namespace DeltaProxy.modules.FirstConnectionKill
 {
     /// <summary>
     /// This is a CLIENT-SIDE module that kills the connection for newly connected clients as a way to protect against bots.
@@ -29,7 +30,7 @@ namespace DeltaProxy.modules
             if (info.Nickname is not null && info.IP is not null && msgSplit.Assert("NICK", 0) && !info.ChangedNickname) // expecting first NICK
             {
                 Database.AllowedEntry? ticket;
-                lock (db.allowedList) ticket = db.allowedList.LastOrDefault((z) => z.Nickname == info.Nickname && (cfg.IgnoreIP || z.IPAddress == info.IP));
+                lock (db.lockObject) ticket = db.allowedList.LastOrDefault((z) => z.Nickname == info.Nickname && (cfg.IgnoreIP || z.IPAddress == info.IP));
                 if (ticket is null) // unfortunately no ticket. Create one and disconnect the user
                 {
                     IssueNewTicket(info);
@@ -41,7 +42,7 @@ namespace DeltaProxy.modules
                 if (!ticket.didReconnect && IRCExtensions.Unix() - ticket.DateNoticed > 300)
                 {
                     // issue a new ticket
-                    lock (db.allowedList) db.allowedList.Remove(ticket);
+                    lock (db.lockObject) db.allowedList.Remove(ticket);
                     IssueNewTicket(info);
                     return false;
                 }
@@ -61,7 +62,7 @@ namespace DeltaProxy.modules
 
         private static void IssueNewTicket(ConnectionInfo info)
         {
-            lock (db.allowedList) db.allowedList.Add(new Database.AllowedEntry() { Nickname = info.Nickname, IPAddress = info.IP, DateNoticed = IRCExtensions.Unix(), didReconnect = false });
+            lock (db.lockObject) db.allowedList.Add(new Database.AllowedEntry() { Nickname = info.Nickname, IPAddress = info.IP, DateNoticed = IRCExtensions.Unix(), didReconnect = false });
 
             // here we'll have to pretend to be server and send an informative message
             info.SendClientMessage($"NOTICE * :*** DeltaProxy: {cfg.KillMessage}");

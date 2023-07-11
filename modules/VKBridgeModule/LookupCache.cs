@@ -7,7 +7,7 @@ using System.Text;
 using System.Threading.Tasks;
 using VKBotExtensions;
 
-namespace VKBridgeModule
+namespace DeltaProxy.modules.VKBridge
 {
     public class LookupCache
     {

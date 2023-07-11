@@ -5,7 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using static DeltaProxy.modules.ConnectionInfoHolderModule;
 
-namespace DeltaProxy.modules
+namespace DeltaProxy.modules.Advertisement
 {
     /// <summary>
     /// This is a SERVER-side module that inserts DeltaProxy advertisement into server's MOTD. It can be disabled safely.

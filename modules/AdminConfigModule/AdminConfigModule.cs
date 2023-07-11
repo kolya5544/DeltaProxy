@@ -6,9 +6,10 @@ using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
+using DeltaProxy.modules.StaffAuth;
 using static DeltaProxy.modules.ConnectionInfoHolderModule;
 
-namespace DeltaProxy.modules
+namespace DeltaProxy.modules.AdminConfig
 {
     /// <summary>
     /// This module allows staff members (authed using StaffAuthModule) to configure and manage modules from within the IRC interface. It is a CLIENT-side module. Use /admin to access it.
@@ -172,7 +173,16 @@ namespace DeltaProxy.modules
 
             if (newModule is not null)
             {
-                ModuleHandler.modules.Add(newModule);
+                lock (ModuleHandler.modules)
+                {
+                    ModuleHandler.modules.Add(newModule);
+
+                    ModuleHandler.modules = ModuleHandler.modules.OrderBy(m => ModuleHandler.GetLoadPriority(m)).ThenBy(m => m.Name).ToList();
+                }
+
+                var enable = ModuleHandler.GetEnableMethod(newModule);
+                enable.Invoke(null, null);
+
                 ModuleHandler.HashModules();
 
                 Program.Log($"Successfully enabled {newModule.Name}...");
@@ -184,7 +194,7 @@ namespace DeltaProxy.modules
             }
         }
 
-        private static void ReloadModule(ConnectionInfo info, AdminChoice ac)
+        public static void UnloadModule(ConnectionInfo info, AdminChoice ac)
         {
             if (ac.ModuleChosen is null)
             {
@@ -202,19 +212,18 @@ namespace DeltaProxy.modules
             var disableMethod = ac.ModuleChosen.GetMethod("OnDisable", BindingFlags.Static | BindingFlags.Public);
             if (disableMethod is not null) disableMethod.Invoke(null, null);
 
-            ModuleHandler.modules.Remove(ac.ModuleChosen);
+            lock (ModuleHandler.modules) ModuleHandler.modules.Remove(ac.ModuleChosen);
+        }
+
+        private static void ReloadModule(ConnectionInfo info, AdminChoice ac)
+        {
+            // we'll try unloading the module
+            UnloadModule(info, ac);
 
             info.SendClientMessage("DeltaProxy", info.Nickname, $"[A] = Disabled '{ac.ModuleChosen.Name}'. Trying to enable it back...");
 
             // then we'll try to load the assembly again
-            var mainClass = ModuleHandler.LoadModule($"modules/{ac.ModuleChosen.Name}.dll");
-
-            ModuleHandler.modules.Add(mainClass);
-            ModuleHandler.HashModules();
-            ac.ModuleChosen = mainClass;
-
-            // if it doesn't work, well too bad.
-            info.SendClientMessage("DeltaProxy", info.Nickname, $"[A] = Enabled '{ac.ModuleChosen.Name}'!");
+            LoadModule(info, ac.ModuleChosen.Name);
         }
 
         public static void SaveConfig(Type module)

@@ -8,7 +8,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace VKBridgeModule
+namespace DeltaProxy.modules.VKBridge
 {
     public class Controller : WebApiController
     {

@@ -15,14 +15,19 @@ namespace DeltaProxy.modules
         public static int CLIENT_PRIORITY = 0; // we want connectioninfo module to catch everything first-hand
         public static int SERVER_PRIORITY = 0;
 
-        public static List<ConnectionInfo> connectedUsers = new List<ConnectionInfo>();
+        public static List<ConnectionInfo> connectedUsers;
         public static ModuleConfig cfg;
         public static Database db;
+
+        public static Dictionary<string, List<ConnectionInfo>> channelUsers;
 
         public static void OnEnable()
         {
             cfg = ModuleConfig.LoadConfig("mod_conninfo.json");
             db = Database.LoadDatabase("conninfo_db.json");
+
+            connectedUsers = new List<ConnectionInfo>();
+            channelUsers = new Dictionary<string, List<ConnectionInfo>>();
         }
 
         public static void ResolveServerMessage(ConnectionInfo info, string msg)
@@ -34,9 +39,29 @@ namespace DeltaProxy.modules
                 info.VHost = msgSplit[3];
                 if (info.stored is not null) info.stored.VHost = info.VHost;
             }
-            if (msgSplit.Assert("433", 1) && msgSplit.AssertCount(4, true) && !info.ChangedNickname) // expects server to decline an already used nickname on first connection
+            if (msgSplit.Assert("433", 1) && msgSplit.AssertCount(4, true)) // expects server to decline an already taken nickname
             {
-                info.Nickname = null;
+                info.Nickname = info._oldNickname;
+            }
+            if (msgSplit.AssertCorrectPerson(info) && msgSplit.Assert("JOIN", 1)) // expects a join confirmation
+            {
+                string channelName = msgSplit[2];
+
+                lock (channelUsers) { if (channelUsers.ContainsKey(channelName)) { channelUsers[channelName].Add(info); } else { channelUsers.Add(channelName, new List<ConnectionInfo>() { info }); } }
+                lock (info.Channels) info.Channels.Add(channelName);
+            }
+            if (msgSplit.AssertCorrectPerson(info) && msgSplit.Assert("PART", 1)) // expects a part confirmation
+            {
+                string channelName = msgSplit[2];
+
+                RemoveUserFromChannel(info, channelName);
+            }
+
+            if (msgSplit.AssertCorrectPerson(info) && msgSplit.Assert("PART", 1)) // expects a kick confirmation
+            {
+                string channelName = msgSplit[2];
+
+                RemoveUserFromChannel(info, channelName);
             }
         }
 
@@ -45,6 +70,7 @@ namespace DeltaProxy.modules
             var msgSplit = msg.SplitMessage();
             if (msgSplit.Assert("NICK", 0) && msgSplit.AssertCount(2)) // Expects NICK command from user
             {
+                info._oldNickname = info.Nickname;
                 if (info.Nickname is not null) info.ChangedNickname = true;
                 info.Nickname = msgSplit[1];
             }
@@ -96,6 +122,22 @@ namespace DeltaProxy.modules
             return true;
         }
 
+        public static void RemoveUserFromChannel(ConnectionInfo user, string channel)
+        {
+            lock (channelUsers)
+            {
+                if (channelUsers.ContainsKey(channel))
+                {
+                    channelUsers[channel].Remove(user);
+                    if (channelUsers[channel].Count == 0)
+                    {
+                        channelUsers.Remove(channel);
+                    }
+                }
+            }
+            lock (user.Channels) user.Channels.Remove(channel);
+        }
+
         public class ModuleConfig : ConfigBase<ModuleConfig>
         {
             // this module is ALWAYS enabled.
@@ -127,6 +169,10 @@ namespace DeltaProxy.modules
             public string IP;
             public string VHost;
             public string Realname;
+            
+            public string _oldNickname = null;
+
+            public List<string> Channels = new(); // keeps track of what channels a user is part of
 
             public bool init = false;
 
@@ -144,7 +190,9 @@ namespace DeltaProxy.modules
             public bool ChangedNickname = false;
 
             public List<string> serverQueue = new List<string>();
-            public List<string> clientQueue = new List<string>();
+            public List<string> postServerQueue = new List<string>(); 
+            public List<string> clientQueue = new List<string>(); // non-post queues send messages BEFORE the initial message
+            public List<string> postClientQueue = new List<string>(); // post queues are used to send a message AFTER the initial processed message
 
             public bool RemoteBlockServer = false; // you can set these to remotely block further execution of code on SERVER module side
             public bool RemoteBlockClient = false; // or CLIENT module side. This flag is being reset after every message received.
@@ -155,17 +203,27 @@ namespace DeltaProxy.modules
 
             public void FlushServerQueue()
             {
-                try
-                {
-                    lock (serverQueue) { serverQueue.ForEach((z) => ServerWriter.WriteLine(z)); serverQueue.Clear(); }
-                }
-                catch { }
+                FlushQueue(ServerWriter, serverQueue);
             }
             public void FlushClientQueue()
             {
+                FlushQueue(Writer, clientQueue);
+            }
+
+            public void FlushPostServerQueue()
+            {
+                FlushQueue(ServerWriter, postServerQueue);
+            }
+            public void FlushPostClientQueue()
+            {
+                FlushQueue(Writer, postClientQueue);
+            }
+
+            public void FlushQueue(StreamWriter sw, List<string> queue)
+            {
                 try
                 {
-                    lock (clientQueue) { clientQueue.ForEach((z) => Writer.WriteLine(z)); clientQueue.Clear(); }
+                    lock (queue) { queue.ForEach((z) => sw.WriteLine(z)); queue.Clear(); }
                 }
                 catch { }
             }
@@ -175,7 +233,7 @@ namespace DeltaProxy.modules
                 get
                 {
                     if (_cached is not null) return _cached;
-                    lock (db.userConnections)
+                    lock (db.lockObject)
                     {
                         var val = db.userConnections.LastOrDefault((z) => z.Nickname == Nickname && z.Username == Username);
                         if (val is not null) _cached = val;
@@ -185,7 +243,7 @@ namespace DeltaProxy.modules
                 set
                 {
                     _cached = null;
-                    lock (db.userConnections) db.userConnections.Add(value);
+                    lock (db.lockObject) db.userConnections.Add(value);
                     db.SaveDatabase();
                 }
             }

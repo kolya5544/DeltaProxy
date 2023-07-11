@@ -1,13 +1,14 @@
-﻿using System;
+﻿using DeltaProxy.modules.Bans;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
-using static DeltaProxy.modules.BansModule;
+using static DeltaProxy.modules.Bans.BansModule;
 using static DeltaProxy.modules.ConnectionInfoHolderModule;
 
-namespace DeltaProxy.modules
+namespace DeltaProxy.modules.Captcha
 {
     /// <summary>
     /// This CLIENT-side module implements different types of text captcha. It can be used with Anope to implement captcha on NickServ or ChanServ operations.

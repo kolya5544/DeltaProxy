@@ -5,7 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using static DeltaProxy.modules.ConnectionInfoHolderModule;
 
-namespace DeltaProxy.modules
+namespace DeltaProxy.modules.StaffAuth
 {
     /// <summary>
     /// This is a CLIENT-side module is used for staff (admins and moderators) to auth as such using a password. This module cannot be disabled. To auth, use /proxyauth password

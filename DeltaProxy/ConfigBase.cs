@@ -30,10 +30,7 @@ namespace DeltaProxy
 
         public void SaveConfig()
         {
-            lock (this)
-            {
-                File.WriteAllText($"conf/{filename}", JsonConvert.SerializeObject(this, Formatting.Indented));
-            }
+            File.WriteAllText($"conf/{filename}", JsonConvert.SerializeObject(this, Formatting.Indented));
         }
     }
 }

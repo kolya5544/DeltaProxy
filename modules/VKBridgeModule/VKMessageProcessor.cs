@@ -10,9 +10,9 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using VKBotExtensions;
 using static DeltaProxy.modules.ConnectionInfoHolderModule;
-using static VKBridgeModule.VKBridgeModule;
+using static DeltaProxy.modules.VKBridge.VKBridgeModule;
 
-namespace VKBridgeModule
+namespace DeltaProxy.modules.VKBridge
 {
     public class VKMessageProcessor
     {
@@ -25,7 +25,8 @@ namespace VKBridgeModule
             var newMembers = new List<SharedVKUserHolder>();
             members.profiles.ForEach((z) =>
             {
-                var connectedPerson = connectedUsers.FirstOrDefault((x) => x.Nickname is not null && x.Nickname.Equals(z.screen_name, StringComparison.OrdinalIgnoreCase));
+                ConnectionInfo connectedPerson;
+                lock (connectedUsers) connectedPerson = connectedUsers.FirstOrDefault((x) => x.Nickname is not null && x.Nickname.Equals(z.screen_name, StringComparison.OrdinalIgnoreCase));
                 newMembers.Add(new SharedVKUserHolder()
                 {
                     screenName = connectedPerson is null ? z.screen_name : $"{VKBridgeModule.cfg.collisionPrefix}{z.screen_name}",
@@ -38,7 +39,8 @@ namespace VKBridgeModule
             });
             members.groups.ForEach((z) =>
             {
-                var connectedPerson = connectedUsers.FirstOrDefault((x) => x.Nickname.Equals(z.screen_name, StringComparison.OrdinalIgnoreCase));
+                ConnectionInfo connectedPerson;
+                lock (connectedUsers) connectedPerson = connectedUsers.FirstOrDefault((x) => x.Nickname is not null && x.Nickname.Equals(z.screen_name, StringComparison.OrdinalIgnoreCase));
                 newMembers.Add(new SharedVKUserHolder()
                 {
                     screenName = connectedPerson is null ? z.screen_name : $"{VKBridgeModule.cfg.collisionPrefix}{z.screen_name}",
@@ -89,7 +91,7 @@ namespace VKBridgeModule
             {
                 if (hashedMembers[z.Key].screenName == z.Value.screenName) return;
                 // nickname change was noticed!
-                lock (bridgeMembers) { bridgeMembers.ForEach((x) => { lock (x.clientQueue) x.clientQueue.Add($"{IRCExtensions.GetTimeString(x)}:{hashedMembers[z.Key].screenName}!{(z.Value.isBot ? "vkbot" : "vkuser")}@vkbridge-user NICK :{z.Value.screenName}"); }); }
+                lock (bridgeMembers) { bridgeMembers.ForEach((x) => { lock (x.clientQueue) x.clientQueue.Add($"{IRCExtensions.GetTimeString(x)}:{hashedMembers[z.Key].screenName}!{(hashedMembers[z.Key].isBot ? "vkbot" : "vkuser")}@vkbridge-user NICK :{z.Value.screenName}"); }); }
             });
 
             if (VKBridgeModule.cfg.sendOnlineUpdatesIRC)
@@ -134,7 +136,7 @@ namespace VKBridgeModule
             if (text == "/ignoreme")
             {
                 bool newStatus = false;
-                lock (VKBridgeModule.db.ignoredVK)
+                lock (VKBridgeModule.db.lockObject)
                 {
                     if (VKBridgeModule.db.ignoredVK.Contains(sender))
                     {
@@ -169,7 +171,7 @@ namespace VKBridgeModule
                 }
 
                 bool isIgnored = false;
-                lock (VKBridgeModule.db.ignores) isIgnored = VKBridgeModule.db.ignores.Any((z) => z.name == msgReceiver.Nickname && z.id == sender);
+                lock (VKBridgeModule.db.lockObject) isIgnored = VKBridgeModule.db.ignores.Any((z) => z.name == msgReceiver.Nickname && z.id == sender);
                 if (isIgnored)
                 {
                     bot.SendMessage(sender, $"Your message was not send! You ignore the user, or are being ignored by the user.");
@@ -186,15 +188,15 @@ namespace VKBridgeModule
 
                 Ignore ignores;
                 bool newStatus = false;
-                lock (VKBridgeModule.db.ignores) ignores = VKBridgeModule.db.ignores.FirstOrDefault((z) => z.createdOnIrc == false && z.id == sender && z.name == whom);
+                lock (VKBridgeModule.db.lockObject) ignores = VKBridgeModule.db.ignores.FirstOrDefault((z) => z.createdOnIrc == false && z.id == sender && z.name == whom);
                 if (ignores is null)
                 {
                     newStatus = true;
                     ignores = new Ignore() { createdOnIrc = false, id = sender, name = whom };
-                    lock (VKBridgeModule.db.ignores) VKBridgeModule.db.ignores.Add(ignores);
+                    lock (VKBridgeModule.db.lockObject) VKBridgeModule.db.ignores.Add(ignores);
                 } else
                 {
-                    lock (VKBridgeModule.db.ignores) VKBridgeModule.db.ignores.Remove(ignores);
+                    lock (VKBridgeModule.db.lockObject) VKBridgeModule.db.ignores.Remove(ignores);
                 }
 
                 bot.SendMessage(chat, $"Successfully {(newStatus ? "BLOCKED" : "unblocked")} user {whom}!");
@@ -445,9 +447,19 @@ namespace VKBridgeModule
 
             string safeForIrc = RemoveBadChar(text).Clamp(1024, 7);
 
+            string finalMessage = string.IsNullOrEmpty(safeForIrc) ? "(пустое сообщение)" : safeForIrc;
+            string[] finalMsgSplit = finalMessage.Split('\n'); 
+            string finalSender = $"{actualSender.screenName}!{(actualSender.isBot ? "vkbot" : "vkuser")}@vkbridge-user";
+            finalMsgSplit.ToList().ForEach((x) =>
+            {
+                backlogChannel.AddMessageSafely(finalSender, x);
+            }); 
             lock (bridgeMembers) bridgeMembers.ForEach((z) =>
             {
-                lock (z.clientQueue) z.clientQueue.Add($"{IRCExtensions.GetTimeString(z)}:{actualSender.screenName}!{(actualSender.isBot ? "vkbot" : "vkuser")}@vkbridge-user PRIVMSG {VKBridgeModule.cfg.ircChat} :{(string.IsNullOrEmpty(safeForIrc) ? "(пустое сообщение)" : safeForIrc)}");
+                finalMsgSplit.ToList().ForEach((x) =>
+                {
+                    lock (z.clientQueue) z.clientQueue.Add($"{IRCExtensions.GetTimeString(z)}:{finalSender} PRIVMSG {VKBridgeModule.cfg.ircChat} :{x}");
+                });
                 z.FlushClientQueueAsync();
             });
         }

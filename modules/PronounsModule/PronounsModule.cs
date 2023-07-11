@@ -2,7 +2,7 @@
 using System.Text.RegularExpressions;
 using static DeltaProxy.modules.ConnectionInfoHolderModule;
 
-namespace PronounsModule
+namespace DeltaProxy.modules.Pronouns
 {
     /// <summary>
     /// This is a CLIENT & SERVER-side module that implements pronouns in /WHOIS. It acts as an example module for DeltaProxy, because it implements
@@ -30,19 +30,20 @@ namespace PronounsModule
         {
             var msgSplit = msg.SplitMessage(); // this method helps us break the message apart into simpler parts
 
-            // we are waiting for a message that looks like this: :{hostname} 319 {info.Nickname} {someone's nickname} :~@#chat
-            if (msgSplit.Assert("319", 1) && msgSplit.AssertCount(4, true)) // asserts that index 1 value is 319 - whois channels code. We will add our reply before there.
+            // we are waiting for a message that looks like this: :{hostname} 311 {info.Nickname} {someone's nickname} :info
+            if (msgSplit.Assert("311", 1) && msgSplit.AssertCount(4, true)) // asserts that index 1 value is 311 - whois beginning. We will add our reply AFTER this line.
             {
                 string subject = msgSplit[3].Trim();
 
                 // check if subject has pronouns
                 Database.Pronouns pronouns;
-                lock (db.pronouns) pronouns = db.pronouns.FirstOrDefault((z) => z.Nickname == subject);
+                lock (db.lockObject) pronouns = db.pronouns.FirstOrDefault((z) => z.Nickname == subject);
 
                 if (pronouns is null) return;
 
                 // SendClientMessage(string) sends a string in this form: :{hostname} {message}
-                info.SendClientMessage($"371 {info.Nickname} {subject} :Preferred pronouns: {pronouns.PronounsText}"); // we use a WHOIS code to send our own WHOIS reply.
+                // ^ as well as SendPostClientMessage(string)
+                info.SendPostClientMessage($"371 {info.Nickname} {subject} :Preferred pronouns: {pronouns.PronounsText}"); // we use a WHOIS code to send our own WHOIS reply.
             }
         }
 
@@ -77,18 +78,18 @@ namespace PronounsModule
 
                     if (pronouns == "clear")
                     {
-                        lock (db.pronouns) db.pronouns.RemoveAll((z) => z.Nickname == info.Nickname);
+                        lock (db.lockObject) db.pronouns.RemoveAll((z) => z.Nickname == info.Nickname);
                         info.SendClientMessage("DeltaProxy", info.Nickname, $"[Pronouns] - Successfully cleared your pronouns field!");
                         db.SaveDatabase(); // don't forget to save the database!!
                         return false;
                     }
 
                     Database.Pronouns pn;
-                    lock (db.pronouns) pn = db.pronouns.FirstOrDefault((z) => z.Nickname == info.Nickname); // checking if such record already exists
+                    lock (db.lockObject) pn = db.pronouns.FirstOrDefault((z) => z.Nickname == info.Nickname); // checking if such record already exists
                     if (pn is null)
                     {
                         pn = new Database.Pronouns() { Nickname = info.Nickname, PronounsText = pronouns };
-                        lock (db.pronouns) db.pronouns.Add(pn);
+                        lock (db.lockObject) db.pronouns.Add(pn);
                     } else
                     {
                         pn.PronounsText = pronouns;

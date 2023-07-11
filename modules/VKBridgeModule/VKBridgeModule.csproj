@@ -9,6 +9,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\deltaproxy\DeltaProxy.csproj" />
     <ProjectReference Include="..\BansModule\BansModule.csproj" />
+    <ProjectReference Include="..\MessageBacklogModule\MessageBacklogModule.csproj" />
   </ItemGroup>
 
   <ItemGroup>

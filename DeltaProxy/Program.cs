@@ -4,6 +4,7 @@ using System.Net.Sockets;
 using System.Security.Cryptography.X509Certificates;
 using System.Net.Security;
 using static DeltaProxy.modules.ConnectionInfoHolderModule;
+using System.Security.Cryptography;
 
 namespace DeltaProxy
 {
@@ -17,6 +18,7 @@ namespace DeltaProxy
             Directory.CreateDirectory("conf");
             Directory.CreateDirectory("db");
             Directory.CreateDirectory("certs");
+            Directory.CreateDirectory("usercerts");
 
             Log($"Enabling modules...");
             ModuleHandler.EnableModules();
@@ -99,11 +101,33 @@ namespace DeltaProxy
                     client_stream = client.GetStream();
                 }
 
-                X509CertificateCollection xes = null;
+                X509CertificateCollection xes = new X509CertificateCollection();
+                string certHash = null;
                 if (remoteCertificate is not null)
                 {
-                    xes = new X509CertificateCollection() { remoteCertificate };
+                    certHash = remoteCertificate.GetCertHashString(HashAlgorithmName.SHA256).ToLower();
                     info.clientCert = remoteCertificate;
+
+                    X509Certificate2 userCert = null;
+                    string userCertLoc = $"usercerts/{certHash}.pem";
+
+                    if (File.Exists(userCertLoc))
+                    {
+                        var data = File.ReadAllBytes(userCertLoc);
+                        userCert = new X509Certificate2(data, certHash);
+                    } else
+                    {
+                        var ecdsa = ECDsa.Create(); // generate asymmetric key pair
+                        var req = new CertificateRequest($"CN={certHash}", ecdsa, HashAlgorithmName.SHA256);
+                        var cert = req.CreateSelfSigned(DateTimeOffset.Now, DateTimeOffset.Now.AddYears(5));
+
+                        var data = cert.Export(X509ContentType.Pfx, certHash); // some weird hack?
+                        userCert = new X509Certificate2(data, certHash);
+
+                        File.WriteAllBytes(userCertLoc, data);
+                    }
+
+                    xes.Add(userCert);
                 }
 
                 client_stream.ReadTimeout = defaultTimeout;
@@ -141,7 +165,10 @@ namespace DeltaProxy
                 server_sr = new StreamReader(server_stream);
 
                 // WebIRC auth
-                server_sw.WriteLine($"WEBIRC {cfg.serverPass} cgiirc {hostname} {ip_address}");
+                string isSecure = isSSL ? " :secure" : "";
+                string clientCert = remoteCertificate is not null ? $" certfp-sha-256={certHash}" : "";
+                if (remoteCertificate is not null) Log($"Found a client cert! {clientCert}");
+                server_sw.WriteLine($"WEBIRC {cfg.serverPass} cgiirc {hostname} {ip_address}{isSecure}{clientCert}");
 
                 Exception clientException = null;
 
@@ -169,6 +196,7 @@ namespace DeltaProxy
                             {  // only let the message through if all modules allowed it.
                                 lock (info.serverQueue) info.serverQueue.Add(cmd); 
                                 info.FlushServerQueue();
+                                info.FlushPostServerQueue(); // this is where we send messages buffered by plugins to be sent AFTER the initial message
                             } 
                         }
                     } catch (Exception ex)
@@ -199,6 +227,7 @@ namespace DeltaProxy
                         }
                         lock (info.clientQueue) info.clientQueue.Add(cmd);
                         info.FlushClientQueue();
+                        info.FlushPostClientQueue(); // this is where we send messages buffered by plugins to be sent AFTER the initial message
                     }
                 }
             } catch (Exception ex)
@@ -208,6 +237,13 @@ namespace DeltaProxy
             } finally
             {
                 lock (connectedUsers) connectedUsers.Remove(info);
+                lock (channelUsers)
+                {
+                    lock (info.Channels)
+                    {
+                        info.Channels.ForEach((z) => channelUsers[z].Remove(info));
+                    }
+                }
                 if (client_stream is not null) client_stream.Close();
                 if (server_stream is not null) server_stream.Close();
                 client.Close();

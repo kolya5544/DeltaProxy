@@ -15,8 +15,10 @@ using EmbedIO.WebApi;
 using Swan.Logging;
 using System.Reflection.Metadata;
 using System.Net.Mail;
+using DeltaProxy.modules.Bans;
+using DeltaProxy.modules.MessageBacklog;
 
-namespace VKBridgeModule
+namespace DeltaProxy.modules.VKBridge
 {
     /// <summary>
     /// This CLIENT and SERVER-side module allows proxy to set up an IRC to VK bridge
@@ -26,7 +28,16 @@ namespace VKBridgeModule
         public static ModuleConfig cfg;
         public static Database db;
         public static VK bot;
-        public static List<ConnectionInfo> bridgeMembers;
+        public static List<ConnectionInfo> bridgeMembers 
+        {
+            get
+            {
+                List<ConnectionInfo> bm;
+                lock (ConnectionInfoHolderModule.channelUsers) ConnectionInfoHolderModule.channelUsers.TryGetValue(cfg.ircChat, out bm);
+                if (bm is null) bm = new List<ConnectionInfo>();
+                return bm;
+            }
+        }
         public static List<SharedVKUserHolder> vkMembers;
         public static Dictionary<long, SharedVKUserHolder> hashedMembers;
         public static LookupCache lc;
@@ -34,6 +45,7 @@ namespace VKBridgeModule
         public static CancellationTokenSource cancelTokenSource;
         public static CancellationTokenSource messagesThread;
         public static CancellationTokenSource userUpdateThread;
+        public static MessageBacklogModule.Database.BacklogChannel backlogChannel;
 
         public static bool ResolveClientMessage(ConnectionInfo info, string msg)
         {
@@ -54,7 +66,7 @@ namespace VKBridgeModule
                 if (vkMessage == "!ignoreme")
                 {
                     bool newStatus = false;
-                    lock (db.ignoredIRC)
+                    lock (db.lockObject)
                     {
                         if (db.ignoredIRC.Contains(info.Nickname))
                         {
@@ -88,16 +100,16 @@ namespace VKBridgeModule
                 {
                     Ignore ignores;
                     bool newStatus = false;
-                    lock (db.ignores) ignores = db.ignores.FirstOrDefault((z) => z.createdOnIrc == true && z.id == actualReciever.id && z.name == info.Nickname);
+                    lock (db.lockObject) ignores = db.ignores.FirstOrDefault((z) => z.createdOnIrc == true && z.id == actualReciever.id && z.name == info.Nickname);
                     if (ignores is null)
                     {
                         newStatus = true;
                         ignores = new Ignore() { createdOnIrc = false, id = actualReciever.id, name = info.Nickname };
-                        lock (db.ignores) db.ignores.Add(ignores);
+                        lock (db.lockObject) db.ignores.Add(ignores);
                     }
                     else
                     {
-                        lock (db.ignores) db.ignores.Remove(ignores);
+                        lock (db.lockObject) db.ignores.Remove(ignores);
                     }
 
                     info.SendClientMessage("DeltaProxy", info.Nickname, $"Successfully {(newStatus ? "BLOCKED" : "unblocked")} user {actualReciever.screenName}!");
@@ -106,7 +118,7 @@ namespace VKBridgeModule
                 }
 
                 bool isIgnored = false;
-                lock (db.ignores) isIgnored = db.ignores.Any((z) => z.name == info.Nickname && z.id == actualReciever.id);
+                lock (db.lockObject) isIgnored = db.ignores.Any((z) => z.name == info.Nickname && z.id == actualReciever.id);
                 if (isIgnored)
                 {
                     info.SendClientMessage("DeltaProxy", info.Nickname, $"Your message was NOT sent. You ignore, or are being ignored by the user.");
@@ -155,19 +167,6 @@ namespace VKBridgeModule
         {
             var msgSplit = msg.SplitMessage();
 
-            if (msgSplit.AssertCorrectPerson(info) && msgSplit.Assert("JOIN", 1) && msgSplit[2].HasChannel(cfg.ircChat)) // expects a bridge channel join confirmation
-            {
-                if (bridgeMembers.Contains(info)) return;
-                lock (bridgeMembers) bridgeMembers.Add(info);
-            }
-            if (msgSplit.AssertCorrectPerson(info) && msgSplit.Assert("QUIT", 1)) // expects someone to quit
-            {
-                lock (bridgeMembers) bridgeMembers.Remove(info);
-            }
-            if (msgSplit.AssertCorrectPerson(info) && msgSplit.Assert("PART", 1)) // expects someone to part successfully - with a server confirmation
-            {
-                lock (bridgeMembers) bridgeMembers.Remove(info);
-            }
             if (msgSplit.Assert("366", 1) && msgSplit[3].HasChannel(cfg.ircChat)) // expect NAMES end of list - to append our own entries
             {
                 lock (vkMembers)
@@ -213,8 +212,25 @@ namespace VKBridgeModule
             cancelTokenSource = new CancellationTokenSource();
             messagesThread = new CancellationTokenSource();
             userUpdateThread = new CancellationTokenSource();
-            if (VKBridgeModule.cfg.isEnabled)
+            if (cfg.isEnabled)
             {
+                if (cfg.useBacklog)
+                {
+                    var chans = MessageBacklogModule.db.channels;
+                    lock (chans) backlogChannel = chans.FirstOrDefault((z) => z.channel == cfg.ircChat);
+                    if (backlogChannel is null)
+                    {
+                        backlogChannel = new MessageBacklogModule.Database.BacklogChannel();
+                        lock (chans) chans.Add(backlogChannel);
+                    }
+                    lock (backlogChannel)
+                    {
+                        backlogChannel.channel = cfg.ircChat;
+                        backlogChannel.maxStoreTime = cfg.backlogStoreTime;
+                        backlogChannel.maxStoreAmount = cfg.backlogStoreAmount;
+                    }
+                }
+
                 new Thread(() =>
                 {
                     bot = new VK(VKBridgeModule.cfg.vkToken, VKBridgeModule.cfg.vkGroup);
@@ -271,8 +287,6 @@ namespace VKBridgeModule
                 try { Logger.UnregisterLogger<ConsoleLogger>(); } catch { }
 
                 web.RunAsync(cancelTokenSource.Token);
-
-                bridgeMembers = new List<ConnectionInfo>();
             }
         }
 
@@ -282,7 +296,6 @@ namespace VKBridgeModule
             messagesThread.Cancel();
             userUpdateThread.Cancel();
         }
-
 
         public static string RemoveSpecialCharacters(string str)
         {
@@ -335,13 +348,16 @@ namespace VKBridgeModule
             public string publicURL = "https://example.com/c/";
             public string cacheServer = "http://127.0.0.1:8818/"; // it's assumed you have a reverse proxy pointing here
             public long storageTime = 72 * 3600;
+
+            public bool useBacklog = true; // uses backlog using MessageBacklogModule
+            public long backlogStoreTime = 3600 * 120;
+            public long backlogStoreAmount = 100;
         }
 
         public class Database : DatabaseBase<Database>
         {
             public List<string> ignoredIRC = new();
             public List<long> ignoredVK = new();
-
             public List<Ignore> ignores = new();
         }
 
