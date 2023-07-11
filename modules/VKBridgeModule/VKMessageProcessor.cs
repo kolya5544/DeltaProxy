@@ -453,7 +453,7 @@ namespace DeltaProxy.modules.VKBridge
             finalMsgSplit.ToList().ForEach((x) =>
             {
                 backlogChannel.AddMessageSafely(finalSender, x);
-            }); 
+            });
             lock (bridgeMembers) bridgeMembers.ForEach((z) =>
             {
                 finalMsgSplit.ToList().ForEach((x) =>

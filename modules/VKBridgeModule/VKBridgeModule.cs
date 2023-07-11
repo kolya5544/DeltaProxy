@@ -86,6 +86,7 @@ namespace DeltaProxy.modules.VKBridge
                 if (db.ignoredIRC.Contains(info.Nickname)) return false; 
 
                 string contentsRemoved = RemoveBadChar(vkMessage);
+                backlogChannel.AddMessageSafely(info, contentsRemoved);
                 bot.SendMessage(cfg.vkChat, $"<{info.Nickname}> {contentsRemoved}");
             }
             if (msgSplit.Assert("PRIVMSG", 0) && msgSplit.AssertCount(3, true)) // expects a message with text
