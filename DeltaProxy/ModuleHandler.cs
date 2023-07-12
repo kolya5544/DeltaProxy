@@ -93,9 +93,9 @@ namespace DeltaProxy
         public static int GetLoadPriority(Type module)
         {
             var loadPriority = module.GetField("LOAD_PRIORITY");
-            if (loadPriority is null) return int.MaxValue;
+            if (loadPriority is null) return int.MaxValue / 2;
             var priorityVal = (int?)loadPriority.GetValue(null);
-            if (priorityVal is null) return int.MaxValue;
+            if (priorityVal is null) return int.MaxValue / 2;
 
             return priorityVal.Value;
         }

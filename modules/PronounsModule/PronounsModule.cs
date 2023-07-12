@@ -13,8 +13,8 @@ namespace DeltaProxy.modules.Pronouns
         // It is important to set priorities for your actions. If you're running network-critical code, like checking for bans, doing connection establishment and
         // other things, this value should be lower. However 0 is reserved for ConnectionInfoHolderModule, and 1 is reserved for BansModule. Feel free to use any
         // other values, or default value. You can initialize them here
-        public static int CLIENT_PRIORITY = int.MaxValue; 
-        public static int SERVER_PRIORITY = int.MaxValue;
+        public static int CLIENT_PRIORITY = int.MaxValue / 2; 
+        public static int SERVER_PRIORITY = int.MaxValue / 2;
 
         // if you want to have any configuration files for your module, you HAVE to create a public static ModuleConfig variable called `cfg`.
         public static ModuleConfig cfg;
