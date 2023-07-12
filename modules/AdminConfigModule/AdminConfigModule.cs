@@ -212,7 +212,7 @@ namespace DeltaProxy.modules.AdminConfig
             var disableMethod = ac.ModuleChosen.GetMethod("OnDisable", BindingFlags.Static | BindingFlags.Public);
             if (disableMethod is not null) disableMethod.Invoke(null, null);
 
-            lock (ModuleHandler.modules) ModuleHandler.modules.Remove(ac.ModuleChosen);
+            lock (ModuleHandler.modules) ModuleHandler.modules.RemoveAll((z) => z.Name == ac.ModuleChosen.Name);
         }
 
         private static void ReloadModule(ConnectionInfo info, AdminChoice ac)

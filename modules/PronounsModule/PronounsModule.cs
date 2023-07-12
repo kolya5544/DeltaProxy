@@ -62,15 +62,15 @@ namespace DeltaProxy.modules.Pronouns
                 if (msgSplit.AssertCount(1)) // this is the same as msgSplit.Count == 1. You can use any form of this expression you like.
                 {
                     info.SendClientMessage("DeltaProxy", info.Nickname, $"[Pronouns] - To set a pronouns, use /PRONOUNS [pronouns], or /PRONOUNS clear. " +
-                        $"Keep in mind it can be no longer than {cfg.maxLength} characters and can only contain alphanumeric characters and / (slash)");
+                        $"Keep in mind it can be no longer than {cfg.maxLength} characters and can only contain alphanumeric characters, ' (quote) and / (slash)");
                 } else if (msgSplit.AssertCount(2, true)) // this is the same as msgSplit.Count >= 2
                 {
-                    string pronouns = msgSplit.ToArray().Join(1); // .Join here allows us to take all values from index 1 till end. It is an extension method.
+                    string pronouns = msgSplit.ToArray().Join(1).Trim(); // .Join here allows us to take all values from index 1 till end. It is an extension method.
 
-                    Regex rg = new Regex("^[a-zA-Z][a-zA-Z0-9/]*$"); // alphanumeric + /
+                    Regex rg = new Regex("^[a-zA-Z][a-zA-Z0-9' \\/]*$"); // alphanumeric + ', space and /
 
                     if (!rg.IsMatch(pronouns) || pronouns.Length > cfg.maxLength) {
-                        info.SendClientMessage("DeltaProxy", info.Nickname, $"[Pronouns] - Pronouns can only contain alphanumeric characters and / (slash), " +
+                        info.SendClientMessage("DeltaProxy", info.Nickname, $"[Pronouns] - Pronouns can only contain alphanumeric characters, ' (quote) and / (slash), " +
                             $"and can be no longer than {cfg.maxLength} characters.");
 
                         return false; // we use false because we don't want server to tell us /PRONOUNS doesn't exist.
