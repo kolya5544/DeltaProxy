@@ -53,7 +53,8 @@ namespace DeltaProxy.modules.Bans
                 }
                 if (disconnect is not null)
                 {
-                    lock (info.clientQueue) info.clientQueue.Add($":{nickname}!{username}@{vhost} QUIT :DeltaProxy: {disconnect.reason}");
+                    var fullName = $"{nickname}!{username}@{vhost}";
+                    lock (info.clientQueue) info.clientQueue.Add($":{info.GetProperNickname(fullName)} QUIT :DeltaProxy: {disconnect.reason}");
                     return false;
                 }
             }
@@ -109,7 +110,8 @@ namespace DeltaProxy.modules.Bans
             {
                 foreach (var z in ModuleHandler.hashed_server)
                 {
-                    string fakeQuitMessage = $":{info.Nickname}!{info.Username}@{info.VHost} QUIT :DeltaProxy: {reason}"; // we'll have to create a fake quit message for other module to process
+                    var fullName = $"{info.Nickname}!{info.Username}@{info.VHost}";
+                    string fakeQuitMessage = $":{info.GetProperNickname(fullName)} QUIT :DeltaProxy: {reason}"; // we'll have to create a fake quit message for other module to process
                     bool? executionResult = (bool?)z.Invoke(null, new object[] { info, fakeQuitMessage });
                     if (executionResult.HasValue && !executionResult.Value) { info.RemoteBlockServer = true; break; } // if a module decides so, we should halt execution
                 }
