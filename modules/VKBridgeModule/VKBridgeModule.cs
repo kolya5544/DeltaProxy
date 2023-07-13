@@ -152,7 +152,8 @@ namespace DeltaProxy.modules.VKBridge
                         {
                             bridgeMembers.ForEach((x) => {
                                 if (x.Nickname == oldName) return;
-                                lock (x.clientQueue) x.clientQueue.Add($"{IRCExtensions.GetTimeString(x)}:{oldName}!{(vm.isBot ? "vkbot" : "vkuser")}@vkbridge-user NICK :{vm.screenName}");
+                                var fullName = $"{oldName}!{(vm.isBot ? "vkbot" : "vkuser")}@vkbridge-user";
+                                lock (x.clientQueue) x.clientQueue.Add($"{IRCExtensions.GetTimeString(x)}:{info.GetProperNickname(fullName)} NICK :{vm.screenName}");
                             });
                         }
                     }
@@ -174,7 +175,7 @@ namespace DeltaProxy.modules.VKBridge
                 {
                     vkMembers.ForEach((z) =>
                     {
-                        info.SendClientMessage($"353 {info.Nickname} = {cfg.ircChat} :{(z.isBot ? "%" : (z.isOnline ? "+" : ""))}{z.screenName}!{(z.isBot ? "vkbot" : "vkuser")}@vkbridge-user");
+                        info.SendClientMessage($"353 {info.Nickname} = {cfg.ircChat} :{z.GetActualUser(info)}");
                     });
                 }
             }
@@ -320,6 +321,12 @@ namespace DeltaProxy.modules.VKBridge
             public bool isBot;
             public bool isOnline;
             public long lastStatusChange;
+
+            public string GetActualUser(ConnectionInfo info)
+            {
+                var fullUser = $"{(isBot ? "%" : (isOnline ? "+" : ""))}{screenName}!{(isBot ? "vkbot" : "vkuser")}@vkbridge-user";
+                return info.GetProperNickname(fullUser);
+            }
         }
 
         public class ModuleConfig : ConfigBase<ModuleConfig>

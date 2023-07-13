@@ -58,7 +58,8 @@ namespace DeltaProxy
 
         public static void SendClientMessage(this ConnectionInfo sw, string sender, string receiver, string message, bool flush = true)
         {
-            lock (sw.clientQueue) sw.clientQueue.Add($":{sender}!proxy@{Program.cfg.serverHostname} NOTICE {receiver} :{message}");
+            var fullUser = $"{sender}!proxy@{Program.cfg.serverHostname}";
+            lock (sw.clientQueue) sw.clientQueue.Add($":{sw.GetProperNickname(fullUser)} NOTICE {receiver} :{message}");
             if (flush) sw.FlushClientQueue();
         }
 
@@ -68,10 +69,9 @@ namespace DeltaProxy
 
             var tuple = id[0].ParseIdentifier();
 
-            if (tuple.Item1 == info.Nickname && info.Username.StartsWith(tuple.Item2) && tuple.Item3 == info.VHost)
-            {
-                return true;
-            }
+            if (tuple.Item1 == info.Nickname && info.Username.StartsWith(tuple.Item2) && tuple.Item3 == info.VHost) return true;
+            if (info is null || info.capabilities.Count == 0) return false;
+            if (!info.capabilities.Contains("userhost-in-names") && tuple.Item1 == info.Nickname) return true;
             return false;
         }
 
@@ -102,6 +102,20 @@ namespace DeltaProxy
         public static string GetTimeString(ConnectionInfo info, long timestampMS)
         {
             return info.capabilities.Contains("server-time") ? $"@time={DateTimeOffset.FromUnixTimeMilliseconds(timestampMS).ToString("yyyy-MM-ddTHH:mm:ss.fffZ")} " : "";
+        }
+
+        public static string GetProperNickname(this ConnectionInfo info)
+        {
+            if (info.capabilities.Contains("userhost-in-names")) return $"{info.Nickname}!{info.Username}@{info.VHost}";
+            return info.Nickname;
+        }
+
+        public static string GetProperNickname(this ConnectionInfo info, string fullUser)
+        {
+            var parse = ParseIdentifier(fullUser);
+
+            if (info.capabilities.Contains("userhost-in-names")) return $"{parse.Item1}!{parse.Item2}@{parse.Item3}";
+            return parse.Item1;
         }
 
         public static string ToDuration(this long? span)

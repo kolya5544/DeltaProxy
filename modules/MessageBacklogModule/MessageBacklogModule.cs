@@ -37,7 +37,7 @@ namespace DeltaProxy.modules.MessageBacklog
                     {
                         chan.messages.ForEach((z) =>
                         {
-                            info.postClientQueue.Add($"{IRCExtensions.GetTimeString(info, z.timestamp)}:{z.sender} PRIVMSG {channelName} :{z.message}");
+                            info.postClientQueue.Add($"{IRCExtensions.GetTimeString(info, z.timestamp)}:{info.GetProperNickname(z.sender)} PRIVMSG {channelName} :{z.message}");
                         });
                     }
                 }

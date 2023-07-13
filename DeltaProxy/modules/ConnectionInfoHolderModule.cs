@@ -45,7 +45,7 @@ namespace DeltaProxy.modules
             }
             if (msgSplit.AssertCorrectPerson(info) && msgSplit.Assert("JOIN", 1)) // expects a join confirmation
             {
-                string channelName = msgSplit[2];
+                string channelName = msgSplit[2].Trim(':');
 
                 lock (channelUsers) { if (channelUsers.ContainsKey(channelName)) { channelUsers[channelName].Add(info); } else { channelUsers.Add(channelName, new List<ConnectionInfo>() { info }); } }
                 lock (info.Channels) info.Channels.Add(channelName);
@@ -197,7 +197,7 @@ namespace DeltaProxy.modules
             public bool RemoteBlockServer = false; // you can set these to remotely block further execution of code on SERVER module side
             public bool RemoteBlockClient = false; // or CLIENT module side. This flag is being reset after every message received.
 
-            public List<string> capabilities;
+            public List<string> capabilities = new();
 
             public X509Certificate? clientCert;
 

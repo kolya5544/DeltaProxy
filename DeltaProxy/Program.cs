@@ -66,7 +66,7 @@ namespace DeltaProxy
             StreamWriter server_sw;
             StreamReader server_sr;
 
-            int defaultTimeout = 4000;
+            int defaultTimeout = 7000;
             int authedTimeout = 120000;
 
             string ip_address = ((IPEndPoint)client.Client.RemoteEndPoint).Address.ToString();
@@ -220,7 +220,7 @@ namespace DeltaProxy
                     if (moduleResponse)
                     {
                         sentCounter += 1;
-                        if (sentCounter == 10)
+                        if (sentCounter == 5)
                         {
                             client_stream.ReadTimeout = authedTimeout;
                             client_stream.WriteTimeout = authedTimeout;
