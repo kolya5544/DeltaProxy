@@ -169,16 +169,36 @@ namespace DeltaProxy.modules.VKBridge
         {
             var msgSplit = msg.SplitMessage();
 
-            if (msgSplit.Assert("366", 1) && msgSplit[3].HasChannel(cfg.ircChat)) // expect NAMES end of list - to append our own entries
+            if (msgSplit.Assert("366", 1) && msgSplit.AssertCount(4, true) && msgSplit[3].HasChannel(cfg.ircChat)) // expect NAMES end of list - to append our own entries
+            {
+                List<string> userlist = new();//msg.GetLongString().Trim(':').Split(' ').ToList(); // :&@abc ~@kolya someoneElse OR :nickname!username@vhost
+                //lock (bridgeMembers) bridgeMembers.ForEach((z) => userlist.Add(info.GetProperNickname($"{z.Nickname}!{z.Username}@{z.VHost}")));
+
+                lock (vkMembers)
+                {
+                    vkMembers.ForEach((z) =>
+                    {
+                        userlist.Add(z.GetActualUser(info));
+                    });
+                }
+
+                userlist.ForEach((z) =>
+                {
+                    info.SendClientMessage($"353 {info.Nickname} = {cfg.ircChat} :{info.GetProperNickname(z)}");
+                });
+                
+            }
+
+            /*if (msgSplit.Assert("315", 1) && msgSplit.AssertCount(4, true) && msgSplit[3].HasChannel(cfg.ircChat)) // expect WHO end of list - appending own entries
             {
                 lock (vkMembers)
                 {
                     vkMembers.ForEach((z) =>
                     {
-                        info.SendClientMessage($"353 {info.Nickname} = {cfg.ircChat} :{z.GetActualUser(info)}");
+                        info.SendClientMessage($"352 {info.Nickname} {cfg.ircChat} {z.screenName} vkbridge-user {Program.cfg.serverHostname} {(z.isBot ? "vkbot" : "vkuser")} Hs :0 VK user at https://vk.com/{z.screenName}");
                     });
                 }
-            }
+            }*/
         }
 
         public static string[] bannedWords = new string[] { "@all", "@everyone", "@online", "@здесь", "@все",
@@ -247,7 +267,7 @@ namespace DeltaProxy.modules.VKBridge
                         {
                             var msg = bot.ReceiveMessage();
 
-                            if (messagesThread.IsCancellationRequested) break;
+                            if (messagesThread.IsCancellationRequested) return;
 
                             foreach (Update u in msg.Updates)
                             {
@@ -322,10 +342,18 @@ namespace DeltaProxy.modules.VKBridge
             public bool isOnline;
             public long lastStatusChange;
 
-            public string GetActualUser(ConnectionInfo info)
+            public string GetActualUser(ConnectionInfo info, bool includeRole = true, bool alwaysFull = false)
             {
-                var fullUser = $"{(isBot ? "%" : (isOnline ? "+" : ""))}{screenName}!{(isBot ? "vkbot" : "vkuser")}@vkbridge-user";
+                string role = includeRole ? $"{(isBot ? "%" : (isOnline ? "+" : ""))}" : "";
+                var fullUser = $"{role}{screenName}!{(isBot ? "vkbot" : "vkuser")}@vkbridge-user";
+                if (alwaysFull) return fullUser;
                 return info.GetProperNickname(fullUser);
+            }
+
+            public string UserMode()
+            {
+                if (isBot) return "Hs%";
+                return $"Hs{(isOnline ? "+" : "")}";
             }
         }
 

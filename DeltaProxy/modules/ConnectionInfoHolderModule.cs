@@ -57,11 +57,15 @@ namespace DeltaProxy.modules
                 RemoveUserFromChannel(info, channelName);
             }
 
-            if (msgSplit.AssertCorrectPerson(info) && msgSplit.Assert("PART", 1)) // expects a kick confirmation
+            // :kolya!Kolya@iktm-FA239AD0.nk.ax KICK #chat-ru kolya123 :kolya
+            if (msgSplit.AssertCorrectPerson(info) && msgSplit.Assert("KICK", 1) && msgSplit.AssertCount(4, true)) // expects a kick confirmation
             {
                 string channelName = msgSplit[2];
+                string kickedUser = msgSplit[3];
 
-                RemoveUserFromChannel(info, channelName);
+                ConnectionInfo usertoKick = null;
+                lock (connectedUsers) usertoKick = connectedUsers.FirstOrDefault((z) => z.Nickname == kickedUser);
+                RemoveUserFromChannel(usertoKick, channelName);
             }
         }
 
@@ -223,7 +227,7 @@ namespace DeltaProxy.modules
             {
                 try
                 {
-                    lock (queue) { queue.ForEach((z) => sw.WriteLine(z)); queue.Clear(); }
+                    lock (queue) { queue.ForEach((z) => { sw.WriteLine(z); Program.Log($"!! {z}"); }); queue.Clear(); }
                 }
                 catch { }
             }

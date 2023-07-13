@@ -69,7 +69,7 @@ namespace DeltaProxy.modules.VKBridge
             {
                 if (hashedMembers.ContainsKey(z.id)) return;
                 // we got a new member! tell everyone they've joined, but don't flush yet.
-                lock (bridgeMembers) { bridgeMembers.ForEach((x) => { lock (x.clientQueue) x.clientQueue.Add($"{IRCExtensions.GetTimeString(x)}:{z.GetActualUser(x)} JOIN {VKBridgeModule.cfg.ircChat} * :{z.fullName}"); }); vkMembers.Add(z); }
+                lock (bridgeMembers) { bridgeMembers.ForEach((x) => { lock (x.clientQueue) x.clientQueue.Add($"{IRCExtensions.GetTimeString(x)}:{z.GetActualUser(x, false, true)} JOIN {VKBridgeModule.cfg.ircChat} * :{z.fullName}"); }); vkMembers.Add(z); }
 
                 // hash
                 hashedMembers.Add(z.id, z);
@@ -80,7 +80,7 @@ namespace DeltaProxy.modules.VKBridge
             {
                 if (localHashmap.ContainsKey(z.Key)) return;
                 // we lost a member. alert
-                lock (bridgeMembers) { bridgeMembers.ForEach((x) => { lock (x.clientQueue) x.clientQueue.Add($"{IRCExtensions.GetTimeString(x)}:{z.Value.GetActualUser(x)} QUIT :Goodbye!"); }); vkMembers.Remove(z.Value); }
+                lock (bridgeMembers) { bridgeMembers.ForEach((x) => { lock (x.clientQueue) x.clientQueue.Add($"{IRCExtensions.GetTimeString(x)}:{z.Value.GetActualUser(x, false, true)} QUIT :Goodbye!"); }); vkMembers.Remove(z.Value); }
 
                 // hash
                 hashedMembers.Remove(z.Key);
@@ -91,7 +91,7 @@ namespace DeltaProxy.modules.VKBridge
             {
                 if (hashedMembers[z.Key].screenName == z.Value.screenName) return;
                 // nickname change was noticed!
-                lock (bridgeMembers) { bridgeMembers.ForEach((x) => { lock (x.clientQueue) x.clientQueue.Add($"{IRCExtensions.GetTimeString(x)}:{hashedMembers[z.Key].GetActualUser(x)} NICK :{z.Value.screenName}"); }); }
+                lock (bridgeMembers) { bridgeMembers.ForEach((x) => { lock (x.clientQueue) x.clientQueue.Add($"{IRCExtensions.GetTimeString(x)}:{hashedMembers[z.Key].GetActualUser(x, false, true)} NICK :{z.Value.screenName}"); }); }
             });
 
             if (VKBridgeModule.cfg.sendOnlineUpdatesIRC)
@@ -103,7 +103,7 @@ namespace DeltaProxy.modules.VKBridge
                     if (hashedMembers[z.Key].isOnline == z.Value.isOnline) return;
                     if ((IRCExtensions.Unix() - z.Value.lastStatusChange <= 1200 && !z.Value.isOnline) || (IRCExtensions.Unix() - z.Value.lastStatusChange <= 300 && z.Value.isOnline)) return;
                     // online status was noticed!
-                    lock (bridgeMembers) { bridgeMembers.ForEach((x) => { lock (x.clientQueue) x.clientQueue.Add($"{IRCExtensions.GetTimeString(x)}:{x.GetProperNickname("DeltaProxy!DeltaProxy@DeltaProxy")} MODE {VKBridgeModule.cfg.ircChat} {(z.Value.isOnline ? "+" : "-")}v {z.Value.screenName}"); }); }
+                    lock (bridgeMembers) { bridgeMembers.ForEach((x) => { lock (x.clientQueue) x.clientQueue.Add($"{IRCExtensions.GetTimeString(x)}:DeltaProxy!DeltaProxy@DeltaProxy MODE {VKBridgeModule.cfg.ircChat} {(z.Value.isOnline ? " + " : "-")}v {z.Value.screenName}"); }); }
                 });
             }
 
@@ -179,7 +179,7 @@ namespace DeltaProxy.modules.VKBridge
                 }
 
                 string safeMsg = RemoveBadChar(text).Clamp(1024, 7);
-                lock (msgReceiver.clientQueue) msgReceiver.clientQueue.Add($"{IRCExtensions.GetTimeString(msgReceiver)}:{actualSender.GetActualUser(msgReceiver)} PRIVMSG {msgReceiver.Nickname} :{message}");
+                lock (msgReceiver.clientQueue) msgReceiver.clientQueue.Add($"{IRCExtensions.GetTimeString(msgReceiver)}:{actualSender.GetActualUser(msgReceiver, false)} PRIVMSG {msgReceiver.Nickname} :{message}");
                 bot.SendMessage(sender, $"Successfully sent the private message!");
                 return;
             } else if (text.StartsWith("/ignore") && mS.AssertCount(2))
@@ -239,7 +239,7 @@ namespace DeltaProxy.modules.VKBridge
                 {
                     bridgeMembers.ForEach((x) =>
                     {
-                        lock (x.clientQueue) x.clientQueue.Add($"{IRCExtensions.GetTimeString(x)}:{newUser.GetActualUser(x)} JOIN {VKBridgeModule.cfg.ircChat} * :{newUser.fullName}");
+                        lock (x.clientQueue) x.clientQueue.Add($"{IRCExtensions.GetTimeString(x)}:{newUser.GetActualUser(x, false)} JOIN {VKBridgeModule.cfg.ircChat} * :{newUser.fullName}");
                     });
                 }
             }
