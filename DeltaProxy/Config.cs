@@ -25,5 +25,6 @@ namespace DeltaProxy
         public string serverPass = "deltaproxy_link";
 
         public bool LogRaw = true;
+        public bool SendUsernameOverWebIRC = true;
     }
 }

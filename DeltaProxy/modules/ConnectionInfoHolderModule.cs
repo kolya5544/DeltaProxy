@@ -1,4 +1,5 @@
 ﻿using DeltaProxy;
+using System.Net;
 using System.Net.Sockets;
 using System.Security.Cryptography.X509Certificates;
 
@@ -77,6 +78,14 @@ namespace DeltaProxy.modules
                 info._oldNickname = info.Nickname;
                 if (info.Nickname is not null) info.ChangedNickname = true;
                 info.Nickname = msgSplit[1];
+
+                // now this is important, we shouldn't let server see this message, but we should let other modules do so.
+                // important for webIRC auth
+
+                // Pass info down to other modules
+                ModuleHandler.ProcessClientMessage(info, msg, typeof(ConnectionInfoHolderModule));
+
+                return false;
             }
             if (info.Username is null && msgSplit.Assert("USER", 0) && msgSplit.AssertCount(2, true)) // Expects USER command from user, but only once
             {
@@ -86,6 +95,33 @@ namespace DeltaProxy.modules
                 {
                     info.Realname = msg.GetLongString();
                 }
+
+                // now this is important!! We send WebIRC auth request
+                // besides we should actually send both NICK & USER to server now.
+
+                // get IP and hostname for WebIRC
+                string ip_address = ((IPEndPoint)info.Client.Client.RemoteEndPoint).Address.ToString();
+                string hostname;
+                try
+                {
+                    hostname = Dns.GetHostEntry(ip_address).HostName;
+                }
+                catch { hostname = ip_address; }
+
+                // WebIRC auth
+                string isSecure = info.isSSL ? " :secure" : "";
+                string clientCert = string.IsNullOrEmpty(info.clientCert) ? "" : $" certfp-sha-256={info.clientCert}";
+                if (!string.IsNullOrEmpty(clientCert)) Program.Log($"Found a client cert! {clientCert}");
+                info.ServerWriter.WriteLine($"WEBIRC {Program.cfg.serverPass} {info.Username} {hostname} {ip_address}{isSecure}{clientCert}");
+
+                // Pass info down to other modules
+                ModuleHandler.ProcessClientMessage(info, msg, typeof(ConnectionInfoHolderModule));
+
+                // Send NICK to server.
+                info.ServerWriter.WriteLine($"NICK {info.Nickname}");
+
+                // Send USER to server.
+                return true;
             }
             if (msgSplit.Assert("SETNAME", 0))
             {
@@ -203,7 +239,9 @@ namespace DeltaProxy.modules
 
             public List<string> capabilities = new();
 
-            public X509Certificate? clientCert;
+            public string? clientCert;
+
+            public bool isSSL;
 
             public void FlushServerQueue()
             {

@@ -70,20 +70,16 @@ namespace DeltaProxy
             int authedTimeout = 120000;
 
             string ip_address = ((IPEndPoint)client.Client.RemoteEndPoint).Address.ToString();
-            string hostname;
-            try
-            {
-                hostname = Dns.GetHostEntry(ip_address).HostName;
-            } catch { hostname = ip_address; }
 
             Stream? client_stream = null;
             Stream? server_stream = null;
             TcpClient server_tcp;
 
-            Console.WriteLine($"New connection from {ip_address} & {hostname}");
+            Console.WriteLine($"New connection from {ip_address}");
             ConnectionInfo info = new ConnectionInfo();
             info.IP = ip_address;
             info.ConnectionTimestamp = IRCExtensions.Unix();
+            info.isSSL = isSSL;
 
             try
             {
@@ -106,7 +102,6 @@ namespace DeltaProxy
                 if (remoteCertificate is not null)
                 {
                     certHash = remoteCertificate.GetCertHashString(HashAlgorithmName.SHA256).ToLower();
-                    info.clientCert = remoteCertificate;
 
                     X509Certificate2 userCert = null;
                     string userCertLoc = $"usercerts/{certHash}.pem";
@@ -128,6 +123,7 @@ namespace DeltaProxy
                     }
 
                     xes.Add(userCert);
+                    info.clientCert = certHash;
                 }
 
                 client_stream.ReadTimeout = defaultTimeout;
@@ -164,15 +160,9 @@ namespace DeltaProxy
                 server_sw = new StreamWriter(server_stream); server_sw.NewLine = "\n"; server_sw.AutoFlush = true;
                 server_sr = new StreamReader(server_stream);
 
-                // WebIRC auth
-                string isSecure = isSSL ? " :secure" : "";
-                string clientCert = remoteCertificate is not null ? $" certfp-sha-256={certHash}" : "";
-                if (remoteCertificate is not null) Log($"Found a client cert! {clientCert}");
-                server_sw.WriteLine($"WEBIRC {cfg.serverPass} deltaproxy {hostname} {ip_address}{isSecure}{clientCert}");
-
                 Exception clientException = null;
 
-                int sentCounter = 0; // increments after every message sent to client by server. Once it reaches 10, client is considered authed. Anti-random connections.
+                int sentCounter = 0; // increments after every message sent FROM server TO client. Once it reaches 5, client is considered authed. Anti-random connections.
 
                 info.Client = client;
                 info.Writer = client_sw;

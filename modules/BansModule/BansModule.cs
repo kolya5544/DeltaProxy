@@ -109,7 +109,7 @@ namespace DeltaProxy.modules.Bans
             var fullName = $"{info.Nickname}!{info.Username}@{info.VHost}";
             string fakeQuitMessage = $":{fullName} QUIT :DeltaProxy: {reason}"; // we'll have to create a fake quit message for other module to process
 
-            ModuleHandler.ProcessServerMessage(info, fakeQuitMessage);
+            ModuleHandler.ProcessServerMessage(info, fakeQuitMessage, typeof(BansModule));
 
             lock (info.serverQueue) info.serverQueue.Add($"QUIT :DeltaProxy Forced Disconnect #{disconnectID}");
             info.FlushServerQueue();

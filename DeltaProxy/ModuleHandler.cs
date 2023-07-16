@@ -180,7 +180,8 @@ namespace DeltaProxy
         /// </summary>
         /// <param name="info">Info about this connection</param>
         /// <param name="msg">Message sent by server</param>
-        public static bool ProcessServerMessage(ConnectionInfo info, string msg)
+        /// <param name="callingMethod">If message was sent by a module, rather than a client, this should be equal to module's name</param>
+        public static bool ProcessServerMessage(ConnectionInfo info, string msg, Type callingMethod = null)
         {
             // making sure the msg doesn't contain @ prefixes like @time=2023-07-09T13:25:37.688Z
             string prefix = null;
@@ -190,6 +191,7 @@ namespace DeltaProxy
             {
                 foreach (var method in hashed_server)
                 {
+                    if (callingMethod is not null && method.DeclaringType == callingMethod) continue;
                     try
                     {
                         bool? executionResult = (bool?)method.Invoke(null, new object[] { info, msg });
@@ -218,13 +220,15 @@ namespace DeltaProxy
         /// </summary>
         /// <param name="info">Info about this connection</param>
         /// <param name="msg">Message sent by a client</param>
+        /// <param name="callingMethod">If message was sent by a module, rather than a client, this should be equal to module's name</param>
         /// <returns>Whether or not the message should be forwarded to server.</returns>
-        public static bool ProcessClientMessage(ConnectionInfo info, string msg)
+        public static bool ProcessClientMessage(ConnectionInfo info, string msg, Type callingMethod = null)
         {
             lock (hashed_client)
             {
                 foreach (var method in hashed_client)
                 {
+                    if (callingMethod is not null && method.DeclaringType == callingMethod) continue;
                     try
                     {
                         bool executionResult = (bool)method.Invoke(null, new object[] { info, msg });
