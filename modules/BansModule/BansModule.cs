@@ -106,16 +106,10 @@ namespace DeltaProxy.modules.Bans
             var disconnectID = CreateDisconnect(info.Nickname, reason);
 
             // we should alert other modules of someone's KICK!! they are NOT going to get the message otherwise, because of BansModule returning FALSE in server processor!!
-            lock (ModuleHandler.hashed_server)
-            {
-                foreach (var z in ModuleHandler.hashed_server)
-                {
-                    var fullName = $"{info.Nickname}!{info.Username}@{info.VHost}";
-                    string fakeQuitMessage = $":{info.GetProperNickname(fullName)} QUIT :DeltaProxy: {reason}"; // we'll have to create a fake quit message for other module to process
-                    bool? executionResult = (bool?)z.Invoke(null, new object[] { info, fakeQuitMessage });
-                    if (executionResult.HasValue && !executionResult.Value) { info.RemoteBlockServer = true; break; } // if a module decides so, we should halt execution
-                }
-            }
+            var fullName = $"{info.Nickname}!{info.Username}@{info.VHost}";
+            string fakeQuitMessage = $":{fullName} QUIT :DeltaProxy: {reason}"; // we'll have to create a fake quit message for other module to process
+
+            ModuleHandler.ProcessServerMessage(info, fakeQuitMessage);
 
             lock (info.serverQueue) info.serverQueue.Add($"QUIT :DeltaProxy Forced Disconnect #{disconnectID}");
             info.FlushServerQueue();

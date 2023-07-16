@@ -168,7 +168,7 @@ namespace DeltaProxy
                 string isSecure = isSSL ? " :secure" : "";
                 string clientCert = remoteCertificate is not null ? $" certfp-sha-256={certHash}" : "";
                 if (remoteCertificate is not null) Log($"Found a client cert! {clientCert}");
-                server_sw.WriteLine($"WEBIRC {cfg.serverPass} cgiirc {hostname} {ip_address}{isSecure}{clientCert}");
+                server_sw.WriteLine($"WEBIRC {cfg.serverPass} deltaproxy {hostname} {ip_address}{isSecure}{clientCert}");
 
                 Exception clientException = null;
 
@@ -201,7 +201,7 @@ namespace DeltaProxy
                         }
                     } catch (Exception ex)
                     {
-                        Log($"{ex.Message} {ex.StackTrace}");
+                        Log($"{ex.Message} {ex.StackTrace} {(ex.InnerException is not null ? $"({ex.InnerException.Message} {ex.StackTrace})" : "")}");
                         clientException = ex;
                     }
                 }).Start();

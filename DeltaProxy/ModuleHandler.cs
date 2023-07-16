@@ -190,13 +190,20 @@ namespace DeltaProxy
             {
                 foreach (var method in hashed_server)
                 {
-                    bool? executionResult = (bool?)method.Invoke(null, new object[] { info, msg });
+                    try
+                    {
+                        bool? executionResult = (bool?)method.Invoke(null, new object[] { info, msg });
 
-                    // some modules can prevent server messages if they return false boolean.
-                    if (executionResult is null) continue;
-                    // also check for remote server block - if one is present, halt execution
-                    if (info.RemoteBlockServer) { info.RemoteBlockServer = false; return false; }
-                    if (executionResult.HasValue && !executionResult.Value) return false;
+                        // some modules can prevent server messages if they return false boolean.
+                        if (executionResult is null) continue;
+                        // also check for remote server block - if one is present, halt execution
+                        if (info.RemoteBlockServer) { info.RemoteBlockServer = false; return false; }
+                        if (executionResult.HasValue && !executionResult.Value) return false;
+                    }
+                    catch (Exception ex)
+                    {
+                        Program.Log($"Fatal Exception by module {method.DeclaringType.Name}: {ex.Message} {ex.StackTrace} {(ex.InnerException is not null ? $"{ex.InnerException.Message} {ex.InnerException.StackTrace}" : "")}");
+                    }
                 }
             }
 
@@ -228,7 +235,7 @@ namespace DeltaProxy
                     }
                     catch (Exception ex)
                     {
-                        Program.Log($"Fatal Exception by module {method.DeclaringType.Name}: {ex.Message} {ex.StackTrace}");
+                        Program.Log($"Fatal Exception by module {method.DeclaringType.Name}: {ex.Message} {ex.StackTrace} {(ex.InnerException is not null ? $"{ex.InnerException.Message} {ex.InnerException.StackTrace}" : "")}");
                     }
                 }
             }

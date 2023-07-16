@@ -227,7 +227,7 @@ namespace DeltaProxy.modules
             {
                 try
                 {
-                    lock (queue) { queue.ForEach((z) => { sw.WriteLine(z); Program.Log($"!! {z}"); }); queue.Clear(); }
+                    lock (queue) { queue.ForEach((z) => { sw.WriteLine(z); /*Program.Log($"!! {z}");*/ }); queue.Clear(); }
                 }
                 catch { }
             }

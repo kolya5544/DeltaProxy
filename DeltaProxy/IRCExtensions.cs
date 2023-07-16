@@ -65,6 +65,7 @@ namespace DeltaProxy
 
         public static bool AssertCorrectPerson(this List<string> id, ConnectionInfo info)
         {
+            if (info is null || string.IsNullOrEmpty(info.Nickname) || string.IsNullOrEmpty(info.Username) || string.IsNullOrEmpty(info.VHost)) return false;
             if (!id.AssertCount(1, true)) return false;
 
             var tuple = id[0].ParseIdentifier();

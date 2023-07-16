@@ -10,6 +10,7 @@ namespace DeltaProxy
     public abstract class DatabaseBase<T> where T : DatabaseBase<T>, new()
     {
         private string filename;
+        [JsonIgnore]
         public object lockObject = new object();
 
         public static T LoadDatabase(string filepath)
