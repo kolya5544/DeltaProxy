@@ -188,7 +188,7 @@ namespace DeltaProxy
                         {
                             var cmd = client_sr.ReadLine();
                             if (string.IsNullOrEmpty(cmd)) throw new Exception("Broken pipe");
-                            Log($"<< {cmd}");
+                            if (cfg.LogRaw) Log($"<< {cmd}");
 
                             // check all CLIENT-side modules
                             var moduleResponse = ModuleHandler.ProcessClientMessage(info, cmd);
@@ -212,7 +212,7 @@ namespace DeltaProxy
                     var cmd = server_sr.ReadLine();
                     if (string.IsNullOrEmpty(cmd)) throw new Exception("Broken pipe");
                     if (clientException is not null) throw clientException;
-                    Log($">> {cmd}");
+                    if (cfg.LogRaw) Log($">> {cmd}");
 
                     // check all SERVER-side modules
                     var moduleResponse = ModuleHandler.ProcessServerMessage(info, cmd);

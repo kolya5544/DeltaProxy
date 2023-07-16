@@ -23,5 +23,7 @@ namespace DeltaProxy
         public int serverPortPlaintext = 6667;
         public string serverHostname = "irc.example.com";
         public string serverPass = "deltaproxy_link";
+
+        public bool LogRaw = true;
     }
 }
