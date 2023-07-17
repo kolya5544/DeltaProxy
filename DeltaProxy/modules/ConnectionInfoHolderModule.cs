@@ -109,10 +109,10 @@ namespace DeltaProxy.modules
                 catch { hostname = ip_address; }
 
                 // WebIRC auth
-                string isSecure = info.isSSL ? " :secure" : "";
-                string clientCert = string.IsNullOrEmpty(info.clientCert) ? "" : $" certfp-sha-256={info.clientCert}";
+                string isSecure = info.isSSL ? "secure" : "";
+                string clientCert = !string.IsNullOrEmpty(info.clientCert) ? $" certfp-sha-256={info.clientCert}" : "";
                 if (!string.IsNullOrEmpty(clientCert)) Program.Log($"Found a client cert! {clientCert}");
-                info.ServerWriter.WriteLine($"WEBIRC {Program.cfg.serverPass} {info.Username} {hostname} {ip_address}{isSecure}{clientCert}");
+                info.ServerWriter.WriteLine($"WEBIRC {Program.cfg.serverPass} {(Program.cfg.SendUsernameOverWebIRC ? info.Username : "deltaproxy")} {hostname} {ip_address} :{isSecure}{clientCert} local-port={info.localPort} remote-port={info.remotePort}");
 
                 // Pass info down to other modules
                 ModuleHandler.ProcessClientMessage(info, msg, typeof(ConnectionInfoHolderModule));
@@ -242,6 +242,9 @@ namespace DeltaProxy.modules
             public string? clientCert;
 
             public bool isSSL;
+
+            public int remotePort;
+            public int localPort;
 
             public void FlushServerQueue()
             {

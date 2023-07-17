@@ -81,6 +81,9 @@ namespace DeltaProxy
             info.ConnectionTimestamp = IRCExtensions.Unix();
             info.isSSL = isSSL;
 
+            info.localPort = isSSL ? cfg.localPort : cfg.portPlaintext;
+            info.remotePort = ((IPEndPoint)client.Client.RemoteEndPoint).Port;
+
             try
             {
                 // initialize the client
