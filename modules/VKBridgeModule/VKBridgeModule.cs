@@ -60,6 +60,30 @@ namespace DeltaProxy.modules.VKBridge
                     BansModule.ProperDisconnect(info, $"Killed for nickname collision.");
                     return ModuleResponse.BLOCK_MODULES;
                 }
+
+                // need to handle a specific edge case with nickname collision first
+                lock (vkMembers)
+                {
+                    SharedVKUserHolder vm;
+                    lock (vkMembers) vm = vkMembers.FirstOrDefault((z) =>
+                    {
+                        return z.screenName.Equals(info.Nickname, StringComparison.OrdinalIgnoreCase);
+                    });
+
+                    if (vm is not null)
+                    {
+                        string oldName = vm.screenName;
+                        vm.screenName = $"{cfg.collisionPrefix}{vm.screenName}";
+                        lock (bridgeMembers)
+                        {
+                            bridgeMembers.ForEach((x) => {
+                                if (x.Nickname == oldName) return;
+                                var fullName = $"{oldName}!{(vm.isBot ? "vkbot" : "vkuser")}@vkbridge-user";
+                                lock (x.clientQueue) x.clientQueue.Add($"{IRCExtensions.GetTimeString(x)}:{info.GetProperNickname(fullName)} NICK :{vm.screenName}");
+                            });
+                        }
+                    }
+                }
             }
             if (msgSplit.Assert("PRIVMSG", 0) && msgSplit.Assert(cfg.ircChat, 1)) // expects a message in the IRC channel
             {
