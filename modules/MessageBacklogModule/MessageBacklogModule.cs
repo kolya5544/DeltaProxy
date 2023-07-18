@@ -1,4 +1,5 @@
 ﻿using System.Threading.Tasks.Dataflow;
+using static DeltaProxy.ModuleHandler;
 using static DeltaProxy.modules.ConnectionInfoHolderModule;
 
 namespace DeltaProxy.modules.MessageBacklog
@@ -15,7 +16,7 @@ namespace DeltaProxy.modules.MessageBacklog
         public static Database db;
         public static CancellationTokenSource dbSaveToken;
 
-        public static void ResolveServerMessage(ConnectionInfo info, string msg)
+        public static ModuleResponse ResolveServerMessage(ConnectionInfo info, string msg)
         {
             List<string> msgSplit = msg.SplitMessage();
 
@@ -25,7 +26,7 @@ namespace DeltaProxy.modules.MessageBacklog
 
                 Database.BacklogChannel chan;
                 lock (db.lockObject) chan = db.channels.FirstOrDefault((z) => z.channel == channelName);
-                if (chan is null) return;
+                if (chan is null) return ModuleResponse.PASS;
 
                 lock (chan.messages) // send backlog if any
                 {
@@ -42,6 +43,8 @@ namespace DeltaProxy.modules.MessageBacklog
                     }
                 }
             }
+
+            return ModuleResponse.PASS;
         }
 
         public static void OnEnable()

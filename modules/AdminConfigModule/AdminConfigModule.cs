@@ -8,6 +8,7 @@ using System.Text;
 using System.Threading.Tasks;
 using DeltaProxy.modules.StaffAuth;
 using static DeltaProxy.modules.ConnectionInfoHolderModule;
+using static DeltaProxy.ModuleHandler;
 
 namespace DeltaProxy.modules.AdminConfig
 {
@@ -19,14 +20,14 @@ namespace DeltaProxy.modules.AdminConfig
         public static ModuleConfig cfg;
         public static List<AdminChoice> choices;
 
-        public static bool ResolveClientMessage(ConnectionInfo info, string msg)
+        public static ModuleResponse ResolveClientMessage(ConnectionInfo info, string msg)
         {
             var msgSplit = msg.SplitMessage();
 
             // check if it's an admin command /admin
             if (msgSplit.Assert("ADMIN", 0))
             {
-                lock (StaffAuthModule.authedStaff) if (!StaffAuthModule.authedStaff.Contains(info)) { info.SendClientMessage("DeltaProxy", info.Nickname, $"Access denied."); return false; }
+                lock (StaffAuthModule.authedStaff) if (!StaffAuthModule.authedStaff.Contains(info)) { info.SendClientMessage("DeltaProxy", info.Nickname, $"Access denied."); return ModuleResponse.BLOCK_PASS; }
 
                 AdminChoice ac;
                 lock (choices) ac = choices.FirstOrDefault((z) => z.Nickname == info.Nickname);
@@ -76,7 +77,7 @@ namespace DeltaProxy.modules.AdminConfig
                     {
                         if (ac.ModuleChosen is null)
                         {
-                            info.SendClientMessage("DeltaProxy", info.Nickname, cfg.error_no_module); return false;
+                            info.SendClientMessage("DeltaProxy", info.Nickname, cfg.error_no_module); return ModuleResponse.BLOCK_PASS;
                         }
 
                         info.SendClientMessage("DeltaProxy", info.Nickname, $"[A] = To edit a property use /admin cfg [name] [value]. For Lists of System.String, use a comma-separated string like `connection,nickserv,chanserv`. Other, more complex data (like classes and lists of classes) is not supported yet.");
@@ -108,7 +109,7 @@ namespace DeltaProxy.modules.AdminConfig
 
                         if (module is null)
                         {
-                            info.SendClientMessage("DeltaProxy", info.Nickname, cfg.error_not_found); return false;
+                            info.SendClientMessage("DeltaProxy", info.Nickname, cfg.error_not_found); return ModuleResponse.BLOCK_PASS;
                         }
 
                         ac.ModuleChosen = module;
@@ -139,7 +140,7 @@ namespace DeltaProxy.modules.AdminConfig
 
                         if (prop is null)
                         {
-                            info.SendClientMessage("DeltaProxy", info.Nickname, cfg.error_no_propery); return false;
+                            info.SendClientMessage("DeltaProxy", info.Nickname, cfg.error_no_propery); return ModuleResponse.BLOCK_PASS;
                         }
 
                         TypeConverter typeConverter = TypeDescriptor.GetConverter(prop.FieldType);
@@ -160,10 +161,10 @@ namespace DeltaProxy.modules.AdminConfig
                     }
                 }
 
-                return false;
+                return ModuleResponse.BLOCK_PASS;
             }
 
-            return true;
+            return ModuleResponse.PASS;
         }
 
         private static void LoadModule(ConnectionInfo info, string moduleName)

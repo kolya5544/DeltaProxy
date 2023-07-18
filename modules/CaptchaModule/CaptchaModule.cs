@@ -5,6 +5,7 @@ using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
+using static DeltaProxy.ModuleHandler;
 using static DeltaProxy.modules.Bans.BansModule;
 using static DeltaProxy.modules.ConnectionInfoHolderModule;
 
@@ -19,7 +20,7 @@ namespace DeltaProxy.modules.Captcha
         public static List<CaptchaInstance> captchas;
         public static Random rng;
 
-        public static bool ResolveClientMessage(ConnectionInfo info, string msg)
+        public static ModuleResponse ResolveClientMessage(ConnectionInfo info, string msg)
         {
             var msgSplit = msg.SplitMessage();
 
@@ -56,7 +57,7 @@ namespace DeltaProxy.modules.Captcha
                     info.SendClientMessage("CaptchSRV", info.Nickname, cfg.no_time_msg);
                     lock (captchas) captchas.Remove(activeCaptcha);
                     BansModule.ProperDisconnect(info, "Failed to solve captcha");
-                    return false;
+                    return ModuleResponse.BLOCK_MODULES;
                 }
 
                 if (msgSplit.Assert("PRIVMSG", 0) && msgSplit.Assert("CaptchSRV", 1) && msgSplit.AssertCount(3, true)) // expect a PRIVMSG CaptchSRV with captcha solution
@@ -68,7 +69,7 @@ namespace DeltaProxy.modules.Captcha
                         info.SendClientMessage("CaptchSRV", info.Nickname, cfg.success_msg);
                         activeCaptcha.passed = true;
                         if (activeCaptcha.action == "connection") activeCaptcha.passUsed += 1;
-                        return false;
+                        return ModuleResponse.BLOCK_MODULES;
                     }
 
                     // not success
@@ -77,12 +78,12 @@ namespace DeltaProxy.modules.Captcha
                         info.SendClientMessage("CaptchSRV", info.Nickname, cfg.no_attempts_msg);
                         lock (captchas) captchas.Remove(activeCaptcha);
                         BansModule.ProperDisconnect(info, "Failed to solve captcha");
-                        return false;
+                        return ModuleResponse.BLOCK_MODULES;
                     }
                     info.SendClientMessage("CaptchSRV", info.Nickname, cfg.incorrect_msg);
                     AlertCaptcha(info, activeCaptcha);
                     activeCaptcha.captchaAttempts += 1;
-                    return false;
+                    return ModuleResponse.BLOCK_MODULES;
                 }
 
                 var cblockHit = cfg.preventCommands.Split(',').FirstOrDefault((z) => msgSplit.Assert(z.Trim(), 0));
@@ -90,22 +91,22 @@ namespace DeltaProxy.modules.Captcha
                 {
                     if ((cblockHit.ToLower() == "nick" && !info.ChangedNickname) || cblockHit.ToLower() != "nick")
                     {
-                        AlertCaptcha(info, activeCaptcha); return false;
+                        AlertCaptcha(info, activeCaptcha); return ModuleResponse.BLOCK_MODULES;
                     }
                 }
             }
 
             if (captchaActions.Contains(currentAction))
             {
-                if (activeCaptcha is not null && activeCaptcha.passed && activeCaptcha.action == currentAction) { activeCaptcha.passUsed += 1; return true; }
-                if (activeCaptcha is not null && activeCaptcha.action == currentAction) { AlertCaptcha(info, activeCaptcha); return currentAction == "connection"; }
+                if (activeCaptcha is not null && activeCaptcha.passed && activeCaptcha.action == currentAction) { activeCaptcha.passUsed += 1; return ModuleResponse.PASS; }
+                if (activeCaptcha is not null && activeCaptcha.action == currentAction) { AlertCaptcha(info, activeCaptcha); return currentAction == "connection" ? ModuleResponse.PASS : ModuleResponse.BLOCK_MODULES; }
                 var newCaptcha = GenerateCaptcha(info, currentAction);
                 lock (captchas) captchas.Add(newCaptcha);
                 AlertCaptcha(info, newCaptcha);
-                return currentAction == "connection"; // we do want to let NICK through for this
+                return currentAction == "connection" ? ModuleResponse.PASS : ModuleResponse.BLOCK_MODULES; // we do want to let NICK through for this
             }
 
-            return true;
+            return ModuleResponse.PASS;
         }
 
         private static CaptchaInstance GenerateCaptcha(ConnectionInfo info, string act)

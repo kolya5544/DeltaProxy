@@ -12,6 +12,7 @@ using static DeltaProxy.modules.Bans.BansModule;
 using static DeltaProxy.modules.WordBlacklist.WordBlacklistModule;
 using DeltaProxy.modules.StaffAuth;
 using DeltaProxy.modules.Bans;
+using static DeltaProxy.ModuleHandler;
 
 namespace DeltaProxy.modules.WordBlacklist
 {
@@ -31,7 +32,7 @@ namespace DeltaProxy.modules.WordBlacklist
             offenders = new List<Offender>();
         }
 
-        public static void ResolveServerMessage(ConnectionInfo info, string msg)
+        public static ModuleResponse ResolveServerMessage(ConnectionInfo info, string msg)
         {
             var msgSplit = msg.SplitMessage();
 
@@ -41,16 +42,18 @@ namespace DeltaProxy.modules.WordBlacklist
                 info.SendClientMessage($"372 {info.Nickname} :-");
                 info.SendClientMessage($"372 {info.Nickname} :- < ! > < ! > ATTENTION! This server uses DeltaProxy with a word blacklist module that WILL analyse ALL personal messages you send against a predefined list of banned phrases. Keep that in mind when chatting, or use OTR! < ! > < ! >");
             }
+
+            return ModuleResponse.PASS;
         }
 
-        public static bool ResolveClientMessage(ConnectionInfo info, string msg)
+        public static ModuleResponse ResolveClientMessage(ConnectionInfo info, string msg)
         {
             var msgSplit = msg.SplitMessage();
 
             // check if it's an admin command /blacklist
             if (msgSplit.Assert("BLACKLIST", 0))
             {
-                lock (StaffAuthModule.authedStaff) if (!StaffAuthModule.authedStaff.Contains(info)) { info.SendClientMessage("DeltaProxy", info.Nickname, $"Access denied."); return false; }
+                lock (StaffAuthModule.authedStaff) if (!StaffAuthModule.authedStaff.Contains(info)) { info.SendClientMessage("DeltaProxy", info.Nickname, $"Access denied."); return ModuleResponse.BLOCK_PASS; }
 
                 if (msgSplit.AssertCount(1))
                 {
@@ -133,14 +136,14 @@ namespace DeltaProxy.modules.WordBlacklist
                             warnings = "0";
                         }
 
-                        if (!allowedActions.Contains(action)) { info.SendClientMessage("DeltaProxy", info.Nickname, $"BL - Unknown action! Actions supported are: kick, mute, ban"); return false; }
+                        if (!allowedActions.Contains(action)) { info.SendClientMessage("DeltaProxy", info.Nickname, $"BL - Unknown action! Actions supported are: kick, mute, ban"); return ModuleResponse.BLOCK_PASS; }
 
                         Database.Pattern pattern;
                         lock (db.lockObject) pattern = db.patterns.FirstOrDefault((z) => z.entry.Equals(entry, StringComparison.OrdinalIgnoreCase));
 
                         if (pattern is not null)
                         {
-                            info.SendClientMessage("DeltaProxy", info.Nickname, $"BL - Entry already exists!"); return false;
+                            info.SendClientMessage("DeltaProxy", info.Nickname, $"BL - Entry already exists!"); return ModuleResponse.BLOCK_PASS;
                         }
 
                         try
@@ -150,12 +153,12 @@ namespace DeltaProxy.modules.WordBlacklist
                         }
                         catch
                         {
-                            info.SendClientMessage("DeltaProxy", info.Nickname, $"BL - Incorrect duration or warnings! Integer values only are accepted."); return false;
+                            info.SendClientMessage("DeltaProxy", info.Nickname, $"BL - Incorrect duration or warnings! Integer values only are accepted."); return ModuleResponse.BLOCK_PASS;
                         }
 
                         if (entry.Length < cfg.minimumEntryLength)
                         {
-                            info.SendClientMessage("DeltaProxy", info.Nickname, $"BL - Entry length is too short! It must be at least {cfg.minimumEntryLength} characters long to prevent false positives."); return false;
+                            info.SendClientMessage("DeltaProxy", info.Nickname, $"BL - Entry length is too short! It must be at least {cfg.minimumEntryLength} characters long to prevent false positives."); return ModuleResponse.BLOCK_PASS;
                         }
 
                         var ptr = new Database.Pattern()
@@ -188,7 +191,7 @@ namespace DeltaProxy.modules.WordBlacklist
 
                 db.SaveDatabase();
 
-                return false;
+                return ModuleResponse.BLOCK_PASS;
             }
 
             // check for actual filters
@@ -198,16 +201,16 @@ namespace DeltaProxy.modules.WordBlacklist
             {
                 content = msg.GetLongString();
             }
-            if (string.IsNullOrEmpty(content)) return true;
+            if (string.IsNullOrEmpty(content)) return ModuleResponse.PASS;
 
             // check if any patterns match
             Database.Pattern ptrn;
             lock (db.lockObject) ptrn = db.patterns.FirstOrDefault((z) => SanitizeCompare(content, z.entry));
-            if (ptrn is null) return true;
+            if (ptrn is null) return ModuleResponse.PASS;
             return CheckAction(info, ptrn);
         }
 
-        private static bool CheckAction(ConnectionInfo info, Database.Pattern ptrn)
+        private static ModuleResponse CheckAction(ConnectionInfo info, Database.Pattern ptrn)
         {
             Offender offender;
             lock (offenders)
@@ -235,14 +238,14 @@ namespace DeltaProxy.modules.WordBlacklist
                     warnings += 1;
                     lock (offender.warnings) offender.warnings[ptrn] = warnings;
                     info.SendClientMessage("DeltaProxy", info.Nickname, ReplacePlaceholders(info, ptrn, cfg.warningMessage, warnings));
-                    return false;
+                    return ModuleResponse.BLOCK_MODULES;
                 }
             }
             // else, just take action
             return TakeAction(info, ptrn);
         }
 
-        private static bool TakeAction(ConnectionInfo info, Database.Pattern ptrn)
+        private static ModuleResponse TakeAction(ConnectionInfo info, Database.Pattern ptrn)
         {
             // possible actions: kick (server disconnect), mute (prevents a person from sending any messages), ban (prevents connection using this IP address + disconnects the user)
 
@@ -268,7 +271,7 @@ namespace DeltaProxy.modules.WordBlacklist
                 BansModule.ProperDisconnect(info, $"Banned for rules violation.");
                 BansModule.db.SaveDatabase();
             }
-            return false;
+            return ModuleResponse.BLOCK_MODULES;
         }
 
         public static string ReplacePlaceholders(ConnectionInfo info, Database.Pattern ptrn, string msg, int warnings = 0)

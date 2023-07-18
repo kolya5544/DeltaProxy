@@ -2,6 +2,7 @@
 using System.Net;
 using System.Net.Sockets;
 using System.Security.Cryptography.X509Certificates;
+using static DeltaProxy.ModuleHandler;
 
 namespace DeltaProxy.modules
 {
@@ -31,7 +32,7 @@ namespace DeltaProxy.modules
             channelUsers = new Dictionary<string, List<ConnectionInfo>>();
         }
 
-        public static void ResolveServerMessage(ConnectionInfo info, string msg)
+        public static ModuleResponse ResolveServerMessage(ConnectionInfo info, string msg)
         {
             var msgSplit = msg.SplitMessage();
 
@@ -68,9 +69,11 @@ namespace DeltaProxy.modules
                 lock (connectedUsers) usertoKick = connectedUsers.FirstOrDefault((z) => z.Nickname == kickedUser);
                 RemoveUserFromChannel(usertoKick, channelName);
             }
+
+            return ModuleResponse.PASS;
         }
 
-        public static bool ResolveClientMessage(ConnectionInfo info, string msg)
+        public static ModuleResponse ResolveClientMessage(ConnectionInfo info, string msg)
         {
             var msgSplit = msg.SplitMessage();
             if (msgSplit.Assert("NICK", 0) && msgSplit.AssertCount(2)) // Expects NICK command from user
@@ -82,10 +85,10 @@ namespace DeltaProxy.modules
                 // now this is important, we shouldn't let server see this message, but we should let other modules do so.
                 // important for webIRC auth
 
-                // Pass info down to other modules
-                ModuleHandler.ProcessClientMessage(info, msg, typeof(ConnectionInfoHolderModule));
-
-                return false;
+                if (Program.cfg.SendUsernameOverWebIRC)
+                {
+                    return ModuleResponse.BLOCK_PASS;
+                }
             }
             if (info.Username is null && msgSplit.Assert("USER", 0) && msgSplit.AssertCount(2, true)) // Expects USER command from user, but only once
             {
@@ -99,34 +102,43 @@ namespace DeltaProxy.modules
                 // now this is important!! We send WebIRC auth request
                 // besides we should actually send both NICK & USER to server now.
 
-                // get IP and hostname for WebIRC
-                string ip_address = ((IPEndPoint)info.Client.Client.RemoteEndPoint).Address.ToString();
-                string hostname;
-                try
+                if (Program.cfg.SendUsernameOverWebIRC)
                 {
-                    hostname = Dns.GetHostEntry(ip_address).HostName;
+                    // get IP and hostname for WebIRC
+
+                    string ip_address = ((IPEndPoint)info.Client.Client.RemoteEndPoint).Address.ToString();
+                    string hostname;
+                    try
+                    {
+                        hostname = Dns.GetHostEntry(ip_address).HostName;
+                    }
+                    catch { hostname = ip_address; }
+
+                    // WebIRC auth
+                    string isSecure = info.isSSL ? "secure" : "";
+                    string clientCert = !string.IsNullOrEmpty(info.clientCert) ? $" certfp-sha-256={info.clientCert}" : "";
+                    if (!string.IsNullOrEmpty(clientCert)) Program.Log($"Found a client cert! {clientCert}");
+                    info.ServerWriter.WriteLine($"WEBIRC {Program.cfg.serverPass} {info.Username} {hostname} {ip_address} :{isSecure}{clientCert} local-port={info.localPort} remote-port={info.remotePort}");
+
+                    info.ServerWriter.WriteLine($"CAP LS 302");
+
+                    // Send NICK to server.
+                    info.ServerWriter.WriteLine($"NICK {info.Nickname}");
+
+                    // Send USER to server.
+                    info.ServerWriter.WriteLine($"USER {info.Username} 0 * :{info.Realname}");
+
+                    info.WebAuthed = true;
+
+                    return ModuleResponse.BLOCK_PASS;
                 }
-                catch { hostname = ip_address; }
-
-                // WebIRC auth
-                string isSecure = info.isSSL ? "secure" : "";
-                string clientCert = !string.IsNullOrEmpty(info.clientCert) ? $" certfp-sha-256={info.clientCert}" : "";
-                if (!string.IsNullOrEmpty(clientCert)) Program.Log($"Found a client cert! {clientCert}");
-                info.ServerWriter.WriteLine($"WEBIRC {Program.cfg.serverPass} {(Program.cfg.SendUsernameOverWebIRC ? info.Username : "deltaproxy")} {hostname} {ip_address} :{isSecure}{clientCert} local-port={info.localPort} remote-port={info.remotePort}");
-
-                // Pass info down to other modules
-                ModuleHandler.ProcessClientMessage(info, msg, typeof(ConnectionInfoHolderModule));
-
-                // Send NICK to server.
-                info.ServerWriter.WriteLine($"NICK {info.Nickname}");
-
-                // Send USER to server.
-                return true;
             }
             if (msgSplit.Assert("SETNAME", 0))
             {
                 info.Realname = msgSplit.ToArray().Join(1);
             }
+
+            if (!info.WebAuthed) return ModuleResponse.BLOCK_ALL;
 
             if (info.stored is not null) // don't forget to update the time spent total!!
             {
@@ -159,7 +171,7 @@ namespace DeltaProxy.modules
                 info.capabilities = capabilities.Split(' ').ToList();
             }
 
-            return true;
+            return ModuleResponse.PASS;
         }
 
         public static void RemoveUserFromChannel(ConnectionInfo user, string channel)
@@ -202,7 +214,7 @@ namespace DeltaProxy.modules
             public long TimeSpentTotal;
         }
 
-        public class ConnectionInfo
+        public partial class ConnectionInfo
         {
             public string Nickname;
             public string Username;
@@ -234,17 +246,17 @@ namespace DeltaProxy.modules
             public List<string> clientQueue = new List<string>(); // non-post queues send messages BEFORE the initial message
             public List<string> postClientQueue = new List<string>(); // post queues are used to send a message AFTER the initial processed message
 
-            public bool RemoteBlockServer = false; // you can set these to remotely block further execution of code on SERVER module side
-            public bool RemoteBlockClient = false; // or CLIENT module side. This flag is being reset after every message received.
-
             public List<string> capabilities = new();
 
             public string? clientCert;
 
             public bool isSSL;
 
-            public int remotePort;
-            public int localPort;
+            public int localPort_IRCd; // port PROXY uses to connect to server on client's behalf
+            public int remotePort; // port user uses their side to connect to PROXY
+            public int localPort; // port uses uses OUR side to connect to PROXY (like 6667)
+
+            public bool WebAuthed = false;
 
             public void FlushServerQueue()
             {

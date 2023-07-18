@@ -12,6 +12,7 @@ namespace DeltaProxy
     {
         public static X509Certificate? serverCert;
         public static Config cfg = Config.LoadConfig("config.json");
+        public static List<ConnectionInfo> allConnections = new List<ConnectionInfo>();
 
         static void Main(string[] args)
         {
@@ -67,9 +68,16 @@ namespace DeltaProxy
             StreamReader server_sr;
 
             int defaultTimeout = 7000;
-            int authedTimeout = 120000;
+            int authedTimeout = 160000;
 
             string ip_address = ((IPEndPoint)client.Client.RemoteEndPoint).Address.ToString();
+
+            string hostname;
+            try
+            {
+                hostname = Dns.GetHostEntry(ip_address).HostName;
+            }
+            catch { hostname = ip_address; }
 
             Stream? client_stream = null;
             Stream? server_stream = null;
@@ -80,9 +88,12 @@ namespace DeltaProxy
             info.IP = ip_address;
             info.ConnectionTimestamp = IRCExtensions.Unix();
             info.isSSL = isSSL;
+            info.WebAuthed = !cfg.SendUsernameOverWebIRC;
 
             info.localPort = isSSL ? cfg.localPort : cfg.portPlaintext;
             info.remotePort = ((IPEndPoint)client.Client.RemoteEndPoint).Port;
+
+            lock (allConnections) allConnections.Add(info);
 
             try
             {
@@ -139,6 +150,7 @@ namespace DeltaProxy
                 if (isSSL)
                 {
                     server_tcp = new TcpClient(cfg.serverIP, cfg.serverPortSSL);
+
                     SslStream sslStream = new SslStream(server_tcp.GetStream(), false);
 
                     if (remoteCertificate is null)
@@ -157,6 +169,8 @@ namespace DeltaProxy
                     server_stream = server_tcp.GetStream();
                 }
 
+                info.localPort_IRCd = ((IPEndPoint)server_tcp.Client.LocalEndPoint).Port;
+
                 server_stream.ReadTimeout = authedTimeout;
                 server_stream.WriteTimeout = authedTimeout;
 
@@ -172,6 +186,14 @@ namespace DeltaProxy
                 info.Stream = client_stream;
                 info.ServerWriter = server_sw;
 
+                if (!cfg.SendUsernameOverWebIRC)
+                {
+                    string isSecure = info.isSSL ? "secure" : "";
+                    string clientCert = !string.IsNullOrEmpty(info.clientCert) ? $" certfp-sha-256={info.clientCert}" : "";
+                    if (!string.IsNullOrEmpty(clientCert)) Log($"Found a client cert! {clientCert}");
+                    info.ServerWriter.WriteLine($"WEBIRC {cfg.serverPass} deltaproxy {hostname} {ip_address} :{isSecure}{clientCert} local-port={info.localPort} remote-port={info.remotePort}");
+                }
+
                 // and now we forward user -> server, indefinitely.
                 new Thread(() =>
                 {
@@ -184,13 +206,25 @@ namespace DeltaProxy
                             if (cfg.LogRaw) Log($"<< {cmd}");
 
                             // check all CLIENT-side modules
-                            var moduleResponse = ModuleHandler.ProcessClientMessage(info, cmd);
-                            if (moduleResponse)
-                            {  // only let the message through if all modules allowed it.
+                            var moduleResponse = ModuleHandler.ProcessClientMessage(info, ref cmd);
+
+                            if (moduleResponse == ModuleHandler.ModuleResponse.PASS) // only let the message through if all modules allowed it.
+                            {  
                                 lock (info.serverQueue) info.serverQueue.Add(cmd); 
                                 info.FlushServerQueue();
                                 info.FlushPostServerQueue(); // this is where we send messages buffered by plugins to be sent AFTER the initial message
-                            } 
+                            }
+                            else if (moduleResponse == ModuleHandler.ModuleResponse.BLOCK_PASS || moduleResponse == ModuleHandler.ModuleResponse.BLOCK_MODULES)
+                            {
+                                // do not send the original message.
+                                info.FlushServerQueue();
+                                info.FlushPostServerQueue();
+                            }
+                            else if (moduleResponse == ModuleHandler.ModuleResponse.BLOCK_ALL)
+                            {
+                                // do nothing.
+                            }
+
                         }
                     } catch (Exception ex)
                     {
@@ -208,9 +242,9 @@ namespace DeltaProxy
                     if (cfg.LogRaw) Log($">> {cmd}");
 
                     // check all SERVER-side modules
-                    var moduleResponse = ModuleHandler.ProcessServerMessage(info, cmd);
+                    var moduleResponse = ModuleHandler.ProcessServerMessage(info, ref cmd);
 
-                    if (moduleResponse)
+                    if (moduleResponse == ModuleHandler.ModuleResponse.PASS)
                     {
                         sentCounter += 1;
                         if (sentCounter == 5)
@@ -218,9 +252,18 @@ namespace DeltaProxy
                             client_stream.ReadTimeout = authedTimeout;
                             client_stream.WriteTimeout = authedTimeout;
                         }
+
                         lock (info.clientQueue) info.clientQueue.Add(cmd);
                         info.FlushClientQueue();
                         info.FlushPostClientQueue(); // this is where we send messages buffered by plugins to be sent AFTER the initial message
+                    } else if (moduleResponse == ModuleHandler.ModuleResponse.BLOCK_PASS || moduleResponse == ModuleHandler.ModuleResponse.BLOCK_MODULES)
+                    {
+                        // do not send the original message.
+                        info.FlushClientQueue();
+                        info.FlushPostClientQueue();
+                    } else if (moduleResponse == ModuleHandler.ModuleResponse.BLOCK_ALL)
+                    {
+                        // do nothing.
                     }
                 }
             } catch (Exception ex)
@@ -229,6 +272,7 @@ namespace DeltaProxy
                 if (ex.InnerException is not null) Log($"{ex.InnerException.Message} {ex.InnerException.StackTrace}");
             } finally
             {
+                lock (allConnections) allConnections.Remove(info);
                 lock (connectedUsers) connectedUsers.Remove(info);
                 lock (channelUsers)
                 {

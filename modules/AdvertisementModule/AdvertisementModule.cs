@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using static DeltaProxy.ModuleHandler;
 using static DeltaProxy.modules.ConnectionInfoHolderModule;
 
 namespace DeltaProxy.modules.Advertisement
@@ -14,7 +15,7 @@ namespace DeltaProxy.modules.Advertisement
     {
         public static ModuleConfig cfg;
 
-        public static void ResolveServerMessage(ConnectionInfo info, string msg)
+        public static ModuleResponse ResolveServerMessage(ConnectionInfo info, string msg)
         {
             var msgSplit = msg.SplitMessage();
 
@@ -24,6 +25,8 @@ namespace DeltaProxy.modules.Advertisement
                 info.SendClientMessage($"372 {info.Nickname} :-");
                 info.SendClientMessage($"372 {info.Nickname} :- This server is powered by DeltaProxy. Advanced bot protection and activity monitoring at {cfg.SourceCode}");
             }
+
+            return ModuleResponse.PASS;
         }
 
         public static void OnEnable()

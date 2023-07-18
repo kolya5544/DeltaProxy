@@ -6,6 +6,7 @@ using System.Linq;
 using System.Net.NetworkInformation;
 using System.Reflection;
 using System.Reflection.Metadata.Ecma335;
+using System.Security.AccessControl;
 using System.Text;
 using System.Threading.Tasks;
 using static DeltaProxy.modules.ConnectionInfoHolderModule;
@@ -24,17 +25,18 @@ namespace DeltaProxy
         /// </summary>
         public static List<Type> modules = new List<Type>() {
             typeof(ConnectionInfoHolderModule),
-            /*typeof(BansModule),
-            typeof(CaptchaModule),
-            typeof(WordBlacklistModule),
-            typeof(AdvertisementModule),
-            typeof(FirstConnectionKillModule), 
-            typeof(StaffAuthModule),
-            typeof(AdminConfigModule)*/
         };
 
         public static List<MethodInfo> hashed_server = new();
         public static List<MethodInfo> hashed_client = new();
+
+        public enum ModuleResponse
+        {
+            PASS = 1, // passes the response to the next module in line - or server, if no modules are in line
+            BLOCK_PASS = 2, // passes the response to the next module, but the request will not reach the server or client. Queue and post-queue will still flush
+            BLOCK_MODULES = 4, // blocks the response from reaching the next module or server/client. Queue and post-queue will still flush
+            BLOCK_ALL = 8, // blocks the response from reaching the next module or server/client. No queues will be flushed
+        }
 
         /// <summary>
         /// Enables all modules by calling OnEnable within enabled modules.
@@ -181,38 +183,41 @@ namespace DeltaProxy
         /// <param name="info">Info about this connection</param>
         /// <param name="msg">Message sent by server</param>
         /// <param name="callingMethod">If message was sent by a module, rather than a client, this should be equal to module's name</param>
-        public static bool ProcessServerMessage(ConnectionInfo info, string msg, Type callingMethod = null)
+        public static ModuleResponse ProcessServerMessage(ConnectionInfo info, ref string msg, Type callingMethod = null)
         {
             // making sure the msg doesn't contain @ prefixes like @time=2023-07-09T13:25:37.688Z
             string prefix = null;
             if (msg.StartsWith("@")) { prefix = msg.SplitMessage()[0]; msg = msg.SplitMessage().ToArray().Join(1); }
 
-            lock (hashed_server)
-            {
-                foreach (var method in hashed_server)
-                {
-                    if (callingMethod is not null && method.DeclaringType == callingMethod) continue;
-                    try
-                    {
-                        bool? executionResult = (bool?)method.Invoke(null, new object[] { info, msg });
+            object[] args = new object[] { info, msg };
 
-                        // some modules can prevent server messages if they return false boolean.
-                        if (executionResult is null) continue;
-                        // also check for remote server block - if one is present, halt execution
-                        if (info.RemoteBlockServer) { info.RemoteBlockServer = false; return false; }
-                        if (executionResult.HasValue && !executionResult.Value) return false;
-                    }
-                    catch (Exception ex)
-                    {
-                        Program.Log($"Fatal Exception by module {method.DeclaringType.Name}: {ex.Message} {ex.StackTrace} {(ex.InnerException is not null ? $"{ex.InnerException.Message} {ex.InnerException.StackTrace}" : "")}");
-                    }
+            ModuleResponse mrp = ModuleResponse.PASS;
+
+            foreach (var method in hashed_server)
+            {
+                if (callingMethod is not null && method.DeclaringType == callingMethod) continue;
+                try
+                {
+                    ModuleResponse? executionResult = (ModuleResponse?)method.Invoke(null, args);
+
+                    msg = (string)args.Last(); // allows modules to overwrite the original message
+
+                    // some modules can prevent server messages if they return proper enum.
+                    if (executionResult is null) continue;
+                    if (executionResult.HasValue && executionResult.Value == ModuleResponse.PASS) continue;
+                    if (executionResult.HasValue && executionResult.Value == ModuleResponse.BLOCK_PASS && (int)mrp < (int)executionResult.Value) mrp = executionResult.Value;
+                    return executionResult.Value;
+                }
+                catch (Exception ex)
+                {
+                    Program.Log($"Fatal Exception by module {method.DeclaringType.Name}: {ex.Message} {ex.StackTrace} {(ex.InnerException is not null ? $"{ex.InnerException.Message} {ex.InnerException.StackTrace}" : "")}");
                 }
             }
 
-            // return msg the prefix string
+            // return the prefix string for the message
             if (!string.IsNullOrEmpty(prefix)) { msg = $"{prefix} {msg}"; }
 
-            return true;
+            return mrp;
         }
 
         /// <summary>
@@ -222,29 +227,33 @@ namespace DeltaProxy
         /// <param name="msg">Message sent by a client</param>
         /// <param name="callingMethod">If message was sent by a module, rather than a client, this should be equal to module's name</param>
         /// <returns>Whether or not the message should be forwarded to server.</returns>
-        public static bool ProcessClientMessage(ConnectionInfo info, string msg, Type callingMethod = null)
+        public static ModuleResponse ProcessClientMessage(ConnectionInfo info, ref string msg, Type callingMethod = null)
         {
-            lock (hashed_client)
-            {
-                foreach (var method in hashed_client)
-                {
-                    if (callingMethod is not null && method.DeclaringType == callingMethod) continue;
-                    try
-                    {
-                        bool executionResult = (bool)method.Invoke(null, new object[] { info, msg });
+            ModuleResponse mrp = ModuleResponse.PASS;
 
-                        // first check for remote client block - if one is present, halt execution
-                        if (info.RemoteBlockClient) { info.RemoteBlockClient = false; return false; }
-                        if (!executionResult) return false; // halt execution as requested by a module
-                    }
-                    catch (Exception ex)
-                    {
-                        Program.Log($"Fatal Exception by module {method.DeclaringType.Name}: {ex.Message} {ex.StackTrace} {(ex.InnerException is not null ? $"{ex.InnerException.Message} {ex.InnerException.StackTrace}" : "")}");
-                    }
+            object[] args = new object[] { info, msg };
+
+            foreach (var method in hashed_client)
+            {
+                if (callingMethod is not null && method.DeclaringType == callingMethod) continue;
+                try
+                {
+                    ModuleResponse? executionResult = (ModuleResponse?)method.Invoke(null, args);
+
+                    msg = (string)args.Last(); // allows modules to overwrite the original message
+
+                    if (executionResult is null) continue;
+                    if (executionResult.HasValue && executionResult.Value == ModuleResponse.PASS) continue;
+                    if (executionResult.HasValue && executionResult.Value == ModuleResponse.BLOCK_PASS && (int)mrp < (int)executionResult.Value) mrp = executionResult.Value;
+                    return executionResult.Value;
+                }
+                catch (Exception ex)
+                {
+                    Program.Log($"Fatal Exception by module {method.DeclaringType.Name}: {ex.Message} {ex.StackTrace} {(ex.InnerException is not null ? $"{ex.InnerException.Message} {ex.InnerException.StackTrace}" : "")}");
                 }
             }
 
-            return true;
+            return mrp;
         }
 
         /// <summary>

@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using static DeltaProxy.ModuleHandler;
 using static DeltaProxy.modules.ConnectionInfoHolderModule;
 
 namespace DeltaProxy.modules.FirstConnectionKill
@@ -22,7 +23,7 @@ namespace DeltaProxy.modules.FirstConnectionKill
             db = Database.LoadDatabase("firstkill_db.json");
         }
 
-        public static bool ResolveClientMessage(ConnectionInfo info, string msg)
+        public static ModuleResponse ResolveClientMessage(ConnectionInfo info, string msg)
         {
             var msgSplit = msg.SplitMessage();
 
@@ -35,7 +36,7 @@ namespace DeltaProxy.modules.FirstConnectionKill
                 {
                     IssueNewTicket(info);
 
-                    return false;
+                    return ModuleResponse.BLOCK_MODULES;
                 }
 
                 // has ticket. check if not expired. Expires in 5 minutes
@@ -44,7 +45,7 @@ namespace DeltaProxy.modules.FirstConnectionKill
                     // issue a new ticket
                     lock (db.lockObject) db.allowedList.Remove(ticket);
                     IssueNewTicket(info);
-                    return false;
+                    return ModuleResponse.BLOCK_MODULES;
                 }
                 else
                 {
@@ -57,7 +58,7 @@ namespace DeltaProxy.modules.FirstConnectionKill
                 }
             }
 
-            return true;
+            return ModuleResponse.PASS;
         }
 
         private static void IssueNewTicket(ConnectionInfo info)

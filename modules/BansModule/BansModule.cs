@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using static DeltaProxy.ModuleHandler;
 using static DeltaProxy.modules.Bans.BansModule;
 using static DeltaProxy.modules.ConnectionInfoHolderModule;
 
@@ -28,7 +29,7 @@ namespace DeltaProxy.modules.Bans
             db = Database.LoadDatabase("bans_db.json");
         }
 
-        public static bool ResolveServerMessage(ConnectionInfo info, string msg)
+        public static ModuleResponse ResolveServerMessage(ConnectionInfo info, string msg)
         {
             var msgSplit = msg.SplitMessage();
 
@@ -55,14 +56,14 @@ namespace DeltaProxy.modules.Bans
                 {
                     var fullName = $"{nickname}!{username}@{vhost}";
                     lock (info.clientQueue) info.clientQueue.Add($":{info.GetProperNickname(fullName)} QUIT :DeltaProxy: {disconnect.reason}");
-                    return false;
+                    return ModuleResponse.BLOCK_MODULES;
                 }
             }
 
-            return true;
+            return ModuleResponse.PASS;
         }
 
-        public static bool ResolveClientMessage(ConnectionInfo info, string msg)
+        public static ModuleResponse ResolveClientMessage(ConnectionInfo info, string msg)
         {
             var msgSplit = msg.SplitMessage();
 
@@ -94,11 +95,11 @@ namespace DeltaProxy.modules.Bans
                 if (mute is not null)
                 {
                     info.SendClientMessage("DeltaProxy", info.Nickname, ReplacePlaceholders(mute, cfg.talkMutedMessage));
-                    return false;
+                    return ModuleResponse.BLOCK_MODULES;
                 }
             }
 
-            return true;
+            return ModuleResponse.PASS;
         }
 
         public static void ProperDisconnect(ConnectionInfo info, string reason = "Disconnected by DeltaProxy.")
@@ -109,7 +110,7 @@ namespace DeltaProxy.modules.Bans
             var fullName = $"{info.Nickname}!{info.Username}@{info.VHost}";
             string fakeQuitMessage = $":{fullName} QUIT :DeltaProxy: {reason}"; // we'll have to create a fake quit message for other module to process
 
-            ModuleHandler.ProcessServerMessage(info, fakeQuitMessage, typeof(BansModule));
+            ModuleHandler.ProcessServerMessage(info, ref fakeQuitMessage, typeof(BansModule));
 
             lock (info.serverQueue) info.serverQueue.Add($"QUIT :DeltaProxy Forced Disconnect #{disconnectID}");
             info.FlushServerQueue();

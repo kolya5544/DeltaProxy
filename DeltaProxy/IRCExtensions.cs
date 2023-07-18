@@ -56,6 +56,12 @@ namespace DeltaProxy
             if (flush) sw.FlushClientQueue();
         }
 
+        public static void SendRawClientMessage(this ConnectionInfo sw, string message, bool flush = true)
+        {
+            lock (sw.clientQueue) sw.clientQueue.Add(message);
+            if (flush) sw.FlushClientQueue();
+        }
+
         public static void SendClientMessage(this ConnectionInfo sw, string sender, string receiver, string message, bool flush = true)
         {
             var fullUser = $"{sender}!proxy@{Program.cfg.serverHostname}";
@@ -88,6 +94,7 @@ namespace DeltaProxy
 
         public static Tuple<string, string, string> ParseIdentifier(this string id)
         {
+            if (!id.Contains("!")) return new Tuple<string, string, string>(id, null, null);
             var splet = id.Trim().Trim(':').Split('@');
             var final = splet.First().Split('!');
             var tuple = new Tuple<string, string, string>(final.First(), final.Last(), splet.Last());

@@ -76,6 +76,7 @@ Here is a list of values contained within `config.json`:
 | serverPortPlaintext | int | Plaintext port to which the proxy will CONNECT to for connections | serverHostname | string | Hostname that will be used by proxy. Has to match the actual hostname of server defined in your IRCd configuration! |
 | serverPass | string | WEBIRC password you've defined in your IRCd configuration. [Don't know what this is?](https://www.unrealircd.org/docs/WebIRC_block#UnrealIRCd-side) |
 | LogRaw | bool | Whether or not server will log raw TCP requests for debugging and troubleshooting purposes |
+| SendUsernameOverWebIRC | bool | Whether or not server will send new client's USERname over WebIRC instead of default gateway name of "deltaproxy". Set this to true if all new users' usernames appear to be "deltaproxy" |
 
 Set all the values in accordance to your needs. At this stage, DeltaProxy should already work out of the box. You can confirm that by saving the config file and launching DeltaProxy again:
 ```

@@ -7,9 +7,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\DeltaProxy\DeltaProxy.csproj" />
-    <ProjectReference Include="..\BansModule\BansModule.csproj" />
-    <ProjectReference Include="..\FakeWhoNamesWhoisModule\FakeWhoNamesWhoisModule.csproj" />
+    <ProjectReference Include="..\..\deltaproxy\DeltaProxy.csproj" />
   </ItemGroup>
 
   <Target Name="PostBuild" AfterTargets="PostBuildEvent">

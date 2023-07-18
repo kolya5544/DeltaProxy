@@ -17,6 +17,7 @@ using System.Reflection.Metadata;
 using System.Net.Mail;
 using DeltaProxy.modules.Bans;
 using DeltaProxy.modules.MessageBacklog;
+using static DeltaProxy.ModuleHandler;
 
 namespace DeltaProxy.modules.VKBridge
 {
@@ -47,7 +48,7 @@ namespace DeltaProxy.modules.VKBridge
         public static CancellationTokenSource userUpdateThread;
         public static MessageBacklogModule.Database.BacklogChannel backlogChannel;
 
-        public static bool ResolveClientMessage(ConnectionInfo info, string msg)
+        public static ModuleResponse ResolveClientMessage(ConnectionInfo info, string msg)
         {
             var msgSplit = msg.SplitMessage();
 
@@ -57,6 +58,7 @@ namespace DeltaProxy.modules.VKBridge
                 {
                     info.SendClientMessage($"NOTICE * :*** DeltaProxy: You cannot use nickname that begins with {cfg.collisionPrefix} while VKBridgeModule is active. Sorry!");
                     BansModule.ProperDisconnect(info, $"Killed for nickname collision.");
+                    return ModuleResponse.BLOCK_MODULES;
                 }
             }
             if (msgSplit.Assert("PRIVMSG", 0) && msgSplit.Assert(cfg.ircChat, 1)) // expects a message in the IRC channel
@@ -80,22 +82,22 @@ namespace DeltaProxy.modules.VKBridge
                     }
                     info.SendClientMessage("DeltaProxy", info.Nickname, $"Success! Your messages will {(newStatus ? "NO LONGER" : "now")} be seen by everyone on VK.");
                     db.SaveDatabase();
-                    return false;
+                    return ModuleResponse.BLOCK_PASS;
                 }
 
-                if (db.ignoredIRC.Contains(info.Nickname)) return false; 
+                if (db.ignoredIRC.Contains(info.Nickname)) return ModuleResponse.PASS; 
 
                 string contentsRemoved = RemoveBadChar(vkMessage);
                 backlogChannel.AddMessageSafely(info, contentsRemoved);
                 bot.SendMessage(cfg.vkChat, $"<{info.Nickname}> {contentsRemoved}");
             }
-            if (msgSplit.Assert("PRIVMSG", 0) && msgSplit.AssertCount(3, true)) // expects a message with text
+            if (msgSplit.Assert("PRIVMSG", 0) && msgSplit.AssertCount(3, true)) // expects a PRIVATE message with text
             {
                 string receiver = msgSplit[1];
                 string contents = msg.GetLongString();
 
                 var actualReciever = vkMembers.FirstOrDefault((z) => z.screenName == receiver);
-                if (actualReciever is null) return true;
+                if (actualReciever is null) return ModuleResponse.PASS;
 
                 if (contents.Trim() == "!ignore")
                 {
@@ -115,7 +117,7 @@ namespace DeltaProxy.modules.VKBridge
 
                     info.SendClientMessage("DeltaProxy", info.Nickname, $"Successfully {(newStatus ? "BLOCKED" : "unblocked")} user {actualReciever.screenName}!");
                     db.SaveDatabase();
-                    return false;
+                    return ModuleResponse.BLOCK_PASS;
                 }
 
                 bool isIgnored = false;
@@ -123,7 +125,7 @@ namespace DeltaProxy.modules.VKBridge
                 if (isIgnored)
                 {
                     info.SendClientMessage("DeltaProxy", info.Nickname, $"Your message was NOT sent. You ignore, or are being ignored by the user.");
-                    return false;
+                    return ModuleResponse.BLOCK_PASS;
                 }
 
                 string attempt = bot.SendMessage(actualReciever.id, $"<{info.Nickname}> {contents}");
@@ -131,7 +133,7 @@ namespace DeltaProxy.modules.VKBridge
                 {
                     info.SendClientMessage("DeltaProxy", info.Nickname, $"Your message was NOT sent. A user should first send a message to the bot to be capable of receiving personal messages.");
                 }
-                return false;
+                return ModuleResponse.BLOCK_PASS;
             }
             if (msgSplit.Assert("JOIN", 0) && msgSplit[1].HasChannel(cfg.ircChat)) // expects a JOIN attempt for channel
             {
@@ -162,10 +164,10 @@ namespace DeltaProxy.modules.VKBridge
 
             lock (bridgeMembers) bridgeMembers.ForEach((x) => x.FlushClientQueueAsync());
 
-            return true;
+            return ModuleResponse.PASS;
         }
 
-        public static void ResolveServerMessage(ConnectionInfo info, string msg)
+        public static ModuleResponse ResolveServerMessage(ConnectionInfo info, string msg)
         {
             var msgSplit = msg.SplitMessage();
 
@@ -189,16 +191,7 @@ namespace DeltaProxy.modules.VKBridge
                 
             }
 
-            /*if (msgSplit.Assert("315", 1) && msgSplit.AssertCount(4, true) && msgSplit[3].HasChannel(cfg.ircChat)) // expect WHO end of list - appending own entries
-            {
-                lock (vkMembers)
-                {
-                    vkMembers.ForEach((z) =>
-                    {
-                        info.SendClientMessage($"352 {info.Nickname} {cfg.ircChat} {z.screenName} vkbridge-user {Program.cfg.serverHostname} {(z.isBot ? "vkbot" : "vkuser")} Hs :0 VK user at https://vk.com/{z.screenName}");
-                    });
-                }
-            }*/
+            return ModuleResponse.PASS;
         }
 
         public static string[] bannedWords = new string[] { "@all", "@everyone", "@online", "@здесь", "@все",

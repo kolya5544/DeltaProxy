@@ -1,5 +1,6 @@
 ﻿using DeltaProxy;
 using System.Text.RegularExpressions;
+using static DeltaProxy.ModuleHandler;
 using static DeltaProxy.modules.ConnectionInfoHolderModule;
 
 namespace DeltaProxy.modules.Pronouns
@@ -26,7 +27,7 @@ namespace DeltaProxy.modules.Pronouns
         /// </summary>
         /// <param name="info">Information about what client is going to RECEIVE the message sent from server</param>
         /// <param name="msg">Raw contents of the message sent from server</param>
-        public static void ResolveServerMessage(ConnectionInfo info, string msg)
+        public static ModuleResponse ResolveServerMessage(ConnectionInfo info, string msg)
         {
             var msgSplit = msg.SplitMessage(); // this method helps us break the message apart into simpler parts
 
@@ -39,12 +40,15 @@ namespace DeltaProxy.modules.Pronouns
                 Database.Pronouns pronouns;
                 lock (db.lockObject) pronouns = db.pronouns.FirstOrDefault((z) => z.Nickname == subject);
 
-                if (pronouns is null) return;
+                if (pronouns is null) return ModuleResponse.PASS;
 
                 // SendClientMessage(string) sends a string in this form: :{hostname} {message}
                 // ^ as well as SendPostClientMessage(string)
                 info.SendPostClientMessage($"371 {info.Nickname} {subject} :Preferred pronouns: {pronouns.PronounsText}"); // we use a WHOIS code to send our own WHOIS reply.
             }
+
+            // that means this message will be PASSed down the line for other modules, and eventually the client himself.
+            return ModuleResponse.PASS;
         }
 
         /// <summary>
@@ -53,7 +57,7 @@ namespace DeltaProxy.modules.Pronouns
         /// <param name="info"></param>
         /// <param name="msg"></param>
         /// <returns>If false, server will not receive this message, and execution of other modules will not conclude</returns>
-        public static bool ResolveClientMessage(ConnectionInfo info, string msg)
+        public static ModuleResponse ResolveClientMessage(ConnectionInfo info, string msg)
         {
             var msgSplit = msg.SplitMessage(); // this method helps us break the message apart into simpler parts
 
@@ -73,7 +77,8 @@ namespace DeltaProxy.modules.Pronouns
                         info.SendClientMessage("DeltaProxy", info.Nickname, $"[Pronouns] - Pronouns can only contain alphanumeric characters, ' (quote) and / (slash), " +
                             $"and can be no longer than {cfg.maxLength} characters.");
 
-                        return false; // we use false because we don't want server to tell us /PRONOUNS doesn't exist.
+                        return ModuleResponse.BLOCK_PASS; // we use BLOCK_PASS because we don't want this message to reach the server.
+                                                          // we don't want to make server tell us /PRONOUNS doesn't exist.
                     }
 
                     if (pronouns == "clear")
@@ -81,7 +86,7 @@ namespace DeltaProxy.modules.Pronouns
                         lock (db.lockObject) db.pronouns.RemoveAll((z) => z.Nickname == info.Nickname);
                         info.SendClientMessage("DeltaProxy", info.Nickname, $"[Pronouns] - Successfully cleared your pronouns field!");
                         db.SaveDatabase(); // don't forget to save the database!!
-                        return false;
+                        return ModuleResponse.BLOCK_PASS;
                     }
 
                     Database.Pronouns pn;
@@ -99,10 +104,10 @@ namespace DeltaProxy.modules.Pronouns
                     db.SaveDatabase(); // don't forget to save the database!!
                 }
 
-                return false;
+                return ModuleResponse.BLOCK_PASS;
             }
 
-            return true; // we didn't match any of our code - just pass it to other modules!
+            return ModuleResponse.PASS; // we didn't match any of our code - just pass it to other modules!
         }
         
         /// <summary>
