@@ -78,6 +78,12 @@ namespace DeltaProxy.modules
             var msgSplit = msg.SplitMessage();
             if (msgSplit.Assert("NICK", 0) && msgSplit.AssertCount(2)) // Expects NICK command from user
             {
+                if (msgSplit[1].Equals("deltaproxy", StringComparison.OrdinalIgnoreCase))
+                {
+                    info.SendClientMessage($"NOTICE * :*** DeltaProxy: This is a reserved nickname. You cannot use it.");
+                    return ModuleResponse.BLOCK_ALL;
+                }
+
                 info._oldNickname = info.Nickname;
                 if (info.Nickname is not null) info.ChangedNickname = true;
                 info.Nickname = msgSplit[1];

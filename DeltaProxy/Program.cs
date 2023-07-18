@@ -81,6 +81,7 @@ namespace DeltaProxy
 
             Stream? client_stream = null;
             Stream? server_stream = null;
+            SslStream? sslStream = null;
             TcpClient server_tcp;
 
             Console.WriteLine($"New connection from {ip_address}");
@@ -101,7 +102,7 @@ namespace DeltaProxy
                 X509Certificate remoteCertificate = null;
                 if (isSSL)
                 {
-                    SslStream sslStream = new SslStream(client.GetStream(), false, VerifyClientCertificate);
+                    sslStream = new SslStream(client.GetStream(), false, VerifyClientCertificate);
                     sslStream.AuthenticateAsServer(serverCert, clientCertificateRequired: true, checkCertificateRevocation: false);
                     remoteCertificate = sslStream.RemoteCertificate;
 
@@ -151,7 +152,7 @@ namespace DeltaProxy
                 {
                     server_tcp = new TcpClient(cfg.serverIP, cfg.serverPortSSL);
 
-                    SslStream sslStream = new SslStream(server_tcp.GetStream(), false);
+                    sslStream = new SslStream(server_tcp.GetStream(), false);
 
                     if (remoteCertificate is null)
                     {
@@ -222,7 +223,8 @@ namespace DeltaProxy
                             }
                             else if (moduleResponse == ModuleHandler.ModuleResponse.BLOCK_ALL)
                             {
-                                // do nothing.
+                                lock (info.serverQueue) info.serverQueue.Clear();
+                                lock (info.postServerQueue) info.postServerQueue.Clear();
                             }
 
                         }
@@ -263,7 +265,8 @@ namespace DeltaProxy
                         info.FlushPostClientQueue();
                     } else if (moduleResponse == ModuleHandler.ModuleResponse.BLOCK_ALL)
                     {
-                        // do nothing.
+                        lock (info.clientQueue) info.clientQueue.Clear();
+                        lock (info.postClientQueue) info.postClientQueue.Clear();
                     }
                 }
             } catch (Exception ex)
@@ -279,6 +282,17 @@ namespace DeltaProxy
                     lock (info.Channels)
                     {
                         info.Channels.ForEach((z) => channelUsers[z].Remove(info));
+                    }
+                }
+                if (sslStream is not null)
+                {
+                    try
+                    {
+                        sslStream.ShutdownAsync().Wait();
+                        sslStream.Close();
+                    } catch
+                    {
+
                     }
                 }
                 if (client_stream is not null) client_stream.Close();

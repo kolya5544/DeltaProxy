@@ -17,8 +17,8 @@ Every module consists of several classes. One of module's classes is considered 
 Bare minimum a module needs is a **`public static void OnEnable()`** method located in any class. The class containing **OnEnable** method is considered **primary** and should contain the rest of system methods and properties.
 
 The rest of base methods define the behaviour of the module, and are OPTIONAL:
-- If the primary class implements **`public static void ResolveServerMessage(ConnectionInfo info, string msg)`** or **`public static bool ResolveServerMessage(ConnectionInfo info, string msg)`**, it will receive a call for every message sent FROM server TO client. If the return type is `bool`, a module can return either `true`, in which case the rest of modules with *higher server priority value* (and, eventually, the client itself) will receive the message, or `false`, in which case the client will not receive the message and no other module with *higher server priority value* than this module will receive or process the message.
-- If the primary class implements **`public static bool ResolveClientMessage(ConnectionInfo info, string msg)`**, it will receive a call for every message sent FROM client TO server. A module must return either `true` or `false`, depending on which a message will either get received by all the modules with *higher client priority value* and the server itself, or no other *higher client priority value* module will receive the message (the server will not receive the message either)
+- If the primary class implements **`public static ModuleResponse ResolveServerMessage(ConnectionInfo info, string msg)`**, it will receive a call for every message sent FROM server TO client. A module can return any of ModuleResponse values, which will define further proxy behaviour.
+- If the primary class implements **`public static ModuleResponse ResolveClientMessage(ConnectionInfo info, string msg)`**, it will receive a call for every message sent FROM client TO server. A module can return any of ModuleResponse values, which will define further proxy behaviour.
 - If the primary class implements **`public static ModuleConfig cfg`** (with this exact field name!), where `ModuleConfig` is defined like `public class ModuleConfig : ConfigBase<ModuleConfig>`, the module is considered **configurable** and can be configured by admins using modules like `AdminConfigModule`. Additionally, if `ModuleConfig` implements **`public bool isEnabled = true`**, DeltaProxy will only load the module while `isEnable` is set to true. **It is important that you DO NOT initialize `cfg` and other non-static class fields in class constructor, but do it in OnEnable instead, to allow the module to be safely disabled and enabled**
 - If the primary class implements **`public static Database db`**, where `Database` is defined like `public class Database : DatabaseBase<Database>`, the module will have its own **database**, where different types of data can be stored. Keep in mind you will still have to regularly call `db.SaveDatabase()` to avoid data loss.
 - If the primary class implements `public static int CLIENT_PRIORITY = int.MaxValue / 2;`, this module will have a *client priority value* of one defined . Modules with *lowest* numbers get executed first when processing relevant messages. **`ConnectionInfoHolderModule`** has a *client priority* of 0.
@@ -29,6 +29,14 @@ The rest of base methods define the behaviour of the module, and are OPTIONAL:
 Variables defined here will affect the workflow of other modules. It is recommended to leave *priorities* at their default values unless it is REQUIRED that a module gets run before/after any other module. 
 
 It is also important you initialize *any necessary variables* in **OnEnable()**, rather than class itself, to allow module to be safely *re-enabled* by calling **OnEnable()**.
+
+## Module Responses
+
+A module can return one of the following values:
+- **ModuleResponse.PASS**, in which case the response will be passed to the next module with *higher priority* in line - or server/client if no modules are left.
+- **ModuleResponse.BLOCK_PASS**, in which case the response will be passed to the next module with *higher priority* in line, but will not be passed to the server/client if no modules are left. *This is recommended for command handling.*
+- **ModuleResponse.BLOCK_MODULES**, in which case the response will be prevented from reaching the next module with *higher priority*, as well as server/client. However queue and post-queue will still be sent if they were defined by modules with *lower priority*. *This is recommended for bans, or other actions after which the user is guaranteed to be disconnected*
+- **ModuleResponse.BLOCK_ALL**, in which case the response will not reach any other modules, the server/client. All queued requests will be dropped, also.
 
 ## Using a module
 
