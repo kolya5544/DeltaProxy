@@ -69,6 +69,11 @@ namespace DeltaProxy
             if (flush) sw.FlushClientQueue();
         }
 
+        public static bool AssertPartOfChannel(this ConnectionInfo info, string channel)
+        {
+            lock (channelUsers) return channelUsers[channel].Contains(info);
+        }
+
         public static bool AssertCorrectPerson(this List<string> id, ConnectionInfo info)
         {
             if (info is null || string.IsNullOrEmpty(info.Nickname) || string.IsNullOrEmpty(info.Username) || string.IsNullOrEmpty(info.VHost)) return false;

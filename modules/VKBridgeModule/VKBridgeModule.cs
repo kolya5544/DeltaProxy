@@ -85,7 +85,7 @@ namespace DeltaProxy.modules.VKBridge
                     }
                 }
             }
-            if (msgSplit.Assert("PRIVMSG", 0) && msgSplit.Assert(cfg.ircChat, 1)) // expects a message in the IRC channel
+            if (msgSplit.Assert("PRIVMSG", 0) && msgSplit.Assert(cfg.ircChat, 1) && info.AssertPartOfChannel(cfg.ircChat)) // expects a message in the IRC channel
             {
                 string vkMessage = msg.GetLongString();
 
