@@ -18,14 +18,11 @@ namespace DeltaProxy.modules
         public static int SERVER_PRIORITY = 0;
 
         public static List<ConnectionInfo> connectedUsers;
-        public static ModuleConfig cfg;
 
         public static Dictionary<string, List<ConnectionInfo>> channelUsers;
 
         public static void OnEnable()
         {
-            cfg = ModuleConfig.LoadConfig("mod_conninfo.json");
-
             connectedUsers = new List<ConnectionInfo>();
             channelUsers = new Dictionary<string, List<ConnectionInfo>>();
         }
@@ -172,13 +169,6 @@ namespace DeltaProxy.modules
                 }
             }
             lock (user.Channels) user.Channels.Remove(channel);
-        }
-
-        public class ModuleConfig : ConfigBase<ModuleConfig>
-        {
-            // this module is ALWAYS enabled.
-            public bool storeConnections = true; // whether or not we should store past connections to keep track of stuff like last connection, seen IPs and stuff.
-            public bool storeIPs = false; // store past IP addresses?
         }
 
         public partial class ConnectionInfo
