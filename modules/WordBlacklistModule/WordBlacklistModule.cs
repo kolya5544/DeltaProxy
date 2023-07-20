@@ -32,6 +32,11 @@ namespace DeltaProxy.modules.WordBlacklist
             offenders = new List<Offender>();
         }
 
+        public static void OnDisable()
+        {
+            db.SaveDatabase();
+        }
+
         public static ModuleResponse ResolveServerMessage(ConnectionInfo info, string msg)
         {
             var msgSplit = msg.SplitMessage();

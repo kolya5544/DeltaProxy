@@ -120,6 +120,14 @@ namespace DeltaProxy.modules.Pronouns
         }
 
         /// <summary>
+        /// Code here will be ran ONCE on server shutdown or module reload. It is important that you: cancel any tokens, save any databases HERE
+        /// </summary>
+        public static void OnDisable()
+        {
+            db.SaveDatabase();
+        }
+
+        /// <summary>
         /// Module config. This is where you can define all the configurable properties your module will have.
         /// </summary>
         public class ModuleConfig : ConfigBase<ModuleConfig>

@@ -30,8 +30,6 @@ namespace DeltaProxy.modules.Identd
 
                 string req = server_sr.ReadLine();
 
-                Program.Log($"Got from server: {req}");
-
                 ConnectionInfo? info = null;
 
                 string[] param = req.Split(',');
@@ -45,12 +43,6 @@ namespace DeltaProxy.modules.Identd
                     Thread.Sleep(250);
                     lock (Program.allConnections) info = Program.allConnections.FirstOrDefault((z) => z.localPort == realProxyPort && z.localPort_IRCd == ircDRemotePort);
                     if (info is not null) break;
-                }
-
-                if (info is null) { 
-                    Program.Log($"Failed to find user with localPort == {realProxyPort} and IRCd port == {ircDRemotePort}");
-                    lock (Program.allConnections) Program.allConnections.ForEach((z) => Program.Log($"{z.IP} {z.localPort} {z.localPort_IRCd}"));
-                    return; 
                 }
 
                 string vrf = VerifyIdentdUsername(info);
@@ -87,13 +79,10 @@ namespace DeltaProxy.modules.Identd
                 sw.WriteLine($"{info.remotePort}, {info.localPort}");
                 string response = sr.ReadLine();
 
-                Program.Log($"{response} @ {ip}:{port}!");
-
                 return response;
             }
             catch (Exception ex)
             {
-                Program.Log($"{ex.Message} @ {ip}:{port}!");
                 return null;
             }
             finally

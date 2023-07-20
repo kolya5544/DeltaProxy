@@ -50,6 +50,7 @@ namespace DeltaProxy.modules.AdminConfig
                     info.SendClientMessage("DeltaProxy", info.Nickname, $"[A] = /admin load [module] -> Load a new module (risky!)");
                     info.SendClientMessage("DeltaProxy", info.Nickname, $"[A] = /admin cfg -> See all possible configuration for selected module");
                     info.SendClientMessage("DeltaProxy", info.Nickname, $"[A] = /admin cfg [name] [value] -> Change configuration value");
+                    info.SendClientMessage("DeltaProxy", info.Nickname, $"[A] = /admin shutdown - Powers off DeltaProxy. Equivalent to 'exit' console command.");
                 }
                 if (msgSplit.AssertCount(2)) // /admin subcmd
                 {
@@ -72,6 +73,10 @@ namespace DeltaProxy.modules.AdminConfig
                     else if (msgSplit.Assert("reload", 1))
                     {
                         ReloadModule(info, ac);
+                    }
+                    else if (msgSplit.Assert("shutdown", 1))
+                    {
+                        ShutdownAllModules();
                     }
                     else if (msgSplit.Assert("cfg", 1))
                     {

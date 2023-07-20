@@ -329,5 +329,25 @@ namespace DeltaProxy
             }
             return true;
         }
+
+        public static void ShutdownAllModules()
+        {
+            // first we remove all the entries in hashed lists to prevent any weird behaviour
+            lock (hashed_client) hashed_client.Clear();
+            lock (hashed_server) hashed_server.Clear();
+
+            // now we call OnDisable of each module in their load order.
+            lock (modules)
+            {
+                modules.ForEach((z) =>
+                {
+                    Program.Log($"Attempting to disable {z.Name}...");
+                    var disableMethod = z.GetMethod("OnDisable", BindingFlags.Static | BindingFlags.Public);
+                    if (disableMethod is not null) disableMethod.Invoke(null, null);
+                });
+            }
+
+            // we're done now!
+        }
     }
 }

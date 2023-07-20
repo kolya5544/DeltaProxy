@@ -13,6 +13,7 @@ namespace DeltaProxy
         public static X509Certificate? serverCert;
         public static Config cfg = Config.LoadConfig("config.json");
         public static List<ConnectionInfo> allConnections = new List<ConnectionInfo>();
+        public static CancellationTokenSource serverActiveToken = new CancellationTokenSource();
 
         static void Main(string[] args)
         {
@@ -29,7 +30,11 @@ namespace DeltaProxy
 
             while (true)
             {
-                Thread.Sleep(60000);
+                string cmd = Console.ReadLine();
+                if (cmd == "exit")
+                {
+                    ShutdownDeltaProxy();
+                }
             }
         }
 
@@ -51,15 +56,19 @@ namespace DeltaProxy
             {
                 while (true)
                 {
+                    if (serverActiveToken.IsCancellationRequested) return;
+
                     // first we initialize the client
                     var client = server.AcceptTcpClient();
+
+                    if (serverActiveToken.IsCancellationRequested) return;
 
                     new Thread(() => ProcessNewConnection(client, isSSL)).Start();
                 }
             }).Start();
         }
 
-        private static void ProcessNewConnection(TcpClient client, bool isSSL)
+        private static async void ProcessNewConnection(TcpClient client, bool isSSL)
         {
             StreamWriter client_sw;
             StreamReader client_sr;
@@ -178,7 +187,9 @@ namespace DeltaProxy
                 server_sw = new StreamWriter(server_stream); server_sw.NewLine = "\n"; server_sw.AutoFlush = true;
                 server_sr = new StreamReader(server_stream);
 
-                Exception clientException = null;
+                Exception? clientException = null;
+
+                CancellationTokenSource exceptionToken = new CancellationTokenSource();
 
                 int sentCounter = 0; // increments after every message sent FROM server TO client. Once it reaches 5, client is considered authed. Anti-random connections.
 
@@ -232,13 +243,14 @@ namespace DeltaProxy
                     {
                         Log($"{ex.Message} {ex.StackTrace} {(ex.InnerException is not null ? $"({ex.InnerException.Message} {ex.StackTrace})" : "")}");
                         clientException = ex;
+                        exceptionToken.Cancel();
                     }
                 }).Start();
 
                 // server -> user forwarding
                 while (true)
                 {
-                    var cmd = server_sr.ReadLine();
+                    var cmd = await server_sr.ReadLineAsync().WaitAsync(exceptionToken.Token);
                     if (string.IsNullOrEmpty(cmd)) throw new Exception("Broken pipe");
                     if (clientException is not null) throw clientException;
                     if (cfg.LogRaw) Log($">> {cmd}");
@@ -271,10 +283,12 @@ namespace DeltaProxy
                 }
             } catch (Exception ex)
             {
+                Log($"exception code");
                 Log($"{ex.Message} {ex.StackTrace}");
                 if (ex.InnerException is not null) Log($"{ex.InnerException.Message} {ex.InnerException.StackTrace}");
             } finally
             {
+                Log($"finally code");
                 lock (allConnections) allConnections.Remove(info);
                 lock (connectedUsers) connectedUsers.Remove(info);
                 lock (channelUsers)
@@ -299,6 +313,26 @@ namespace DeltaProxy
                 if (server_stream is not null) server_stream.Close();
                 client.Close();
             }
+        }
+        public static void ShutdownDeltaProxy()
+        {
+            serverActiveToken.Cancel();
+            Log($"Terminating DeltaProxy... Disconnecting all clients.");
+            lock (allConnections) allConnections.ForEach((z) =>
+            {
+                new Thread(() => { z.SendRawClientMessage($"ERROR :DeltaProxy is shutting down!"); z.Client.Close(); }).Start();
+            });
+            while (true)
+            {
+                int connectedCount = 0;
+                lock (allConnections) connectedCount = allConnections.Count;
+                if (connectedCount == 0) break;
+                Thread.Sleep(100);
+            }
+            Log($"Terminating DeltaProxy... Disabling all modules.");
+            ModuleHandler.ShutdownAllModules();
+            Log($"Terminating DeltaProxy... Success!");
+            Environment.Exit(0);
         }
 
         private static bool VerifyClientCertificate(object sender, X509Certificate? certificate, X509Chain? chain, SslPolicyErrors sslPolicyErrors)

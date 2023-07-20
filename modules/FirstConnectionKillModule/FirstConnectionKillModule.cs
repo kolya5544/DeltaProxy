@@ -23,6 +23,11 @@ namespace DeltaProxy.modules.FirstConnectionKill
             db = Database.LoadDatabase("firstkill_db.json");
         }
 
+        public static void OnDisable()
+        {
+            db.SaveDatabase();
+        }
+
         public static ModuleResponse ResolveClientMessage(ConnectionInfo info, string msg)
         {
             var msgSplit = msg.SplitMessage();

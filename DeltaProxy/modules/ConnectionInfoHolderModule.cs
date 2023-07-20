@@ -19,14 +19,12 @@ namespace DeltaProxy.modules
 
         public static List<ConnectionInfo> connectedUsers;
         public static ModuleConfig cfg;
-        public static Database db;
 
         public static Dictionary<string, List<ConnectionInfo>> channelUsers;
 
         public static void OnEnable()
         {
             cfg = ModuleConfig.LoadConfig("mod_conninfo.json");
-            db = Database.LoadDatabase("conninfo_db.json");
 
             connectedUsers = new List<ConnectionInfo>();
             channelUsers = new Dictionary<string, List<ConnectionInfo>>();
@@ -39,7 +37,6 @@ namespace DeltaProxy.modules
             if (msgSplit.Assert("396", 1) && msgSplit.AssertCount(5, true)) // expects server to set a VHost
             {
                 info.VHost = msgSplit[3];
-                if (info.stored is not null) info.stored.VHost = info.VHost;
             }
             if (msgSplit.Assert("433", 1) && msgSplit.AssertCount(4, true)) // expects server to decline an already taken nickname
             {
@@ -146,25 +143,6 @@ namespace DeltaProxy.modules
 
             if (!info.WebAuthed) return ModuleResponse.BLOCK_ALL;
 
-            if (info.stored is not null) // don't forget to update the time spent total!!
-            {
-                var currentTime = IRCExtensions.UnixMS();
-                info.stored.TimeSpentTotal += currentTime - info.LastMessage;
-                info.LastMessage = currentTime;
-            }
-
-            if (info.stored is null && info.Nickname is not null && info.Username is not null) // store the connection once Nickname, Username (and realname if present) are acquired
-            {
-                info.stored = new()
-                {
-                    IP = info.IP,
-                    LastConnection = info.ConnectionTimestamp,
-                    Nickname = info.Nickname,
-                    Username = info.Username,
-                    TimeSpentTotal = IRCExtensions.UnixMS() - info.ConnectionTimestamp * 1000,
-                    Realname = info.Realname
-                };
-            }
             if (info.Nickname is not null && info.Username is not null && !info.init)
             {
                 info.init = true;
@@ -203,23 +181,6 @@ namespace DeltaProxy.modules
             public bool storeIPs = false; // store past IP addresses?
         }
 
-        public class Database : DatabaseBase<Database>
-        {
-            public List<StoredConnection> userConnections = new();
-        }
-
-        public class StoredConnection
-        {
-            public string Nickname;
-            public string Username;
-            public string IP;
-            public string VHost;
-            public string Realname;
-
-            public long LastConnection;
-            public long TimeSpentTotal;
-        }
-
         public partial class ConnectionInfo
         {
             public string Nickname;
@@ -242,8 +203,6 @@ namespace DeltaProxy.modules
 
             public long ConnectionTimestamp;
             public long LastMessage;
-
-            private StoredConnection _cached;
 
             public bool ChangedNickname = false;
 
@@ -289,26 +248,6 @@ namespace DeltaProxy.modules
                     lock (queue) { queue.ForEach((z) => { sw.WriteLine(z); /*Program.Log($"!! {z}");*/ }); queue.Clear(); }
                 }
                 catch { }
-            }
-
-            public StoredConnection stored
-            {
-                get
-                {
-                    if (_cached is not null) return _cached;
-                    lock (db.lockObject)
-                    {
-                        var val = db.userConnections.LastOrDefault((z) => z.Nickname == Nickname && z.Username == Username);
-                        if (val is not null) _cached = val;
-                        return val;
-                    }
-                }
-                set
-                {
-                    _cached = null;
-                    lock (db.lockObject) db.userConnections.Add(value);
-                    db.SaveDatabase();
-                }
             }
         }
     }

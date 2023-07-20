@@ -331,6 +331,7 @@ namespace DeltaProxy.modules.VKBridge
 
         public static void OnDisable()
         {
+            db.SaveDatabase();
             cancelTokenSource.Cancel();
             messagesThread.Cancel();
             userUpdateThread.Cancel();

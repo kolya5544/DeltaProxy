@@ -52,8 +52,7 @@ namespace DeltaProxy
 
         public static void SendClientMessage(this ConnectionInfo sw, string message, bool flush = true)
         {
-            lock (sw.clientQueue) sw.clientQueue.Add($":{Program.cfg.serverHostname} {message}");
-            if (flush) sw.FlushClientQueue();
+            SendRawClientMessage(sw, $":{Program.cfg.serverHostname} {message}", flush);
         }
 
         public static void SendRawClientMessage(this ConnectionInfo sw, string message, bool flush = true)
@@ -81,7 +80,7 @@ namespace DeltaProxy
 
             var tuple = id[0].ParseIdentifier();
 
-            if (tuple.Item1 == info.Nickname && info.Username.StartsWith(tuple.Item2) && tuple.Item3 == info.VHost) return true;
+            if (tuple.Item1 == info.Nickname && tuple.Item3 == info.VHost) return true;
             if (info is null || info.capabilities.Count == 0) return false;
             if (!info.capabilities.Contains("userhost-in-names") && tuple.Item1 == info.Nickname) return true;
             return false;
