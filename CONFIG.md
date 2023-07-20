@@ -113,3 +113,7 @@ A: Make sure you've configured WebIRC properly and that your IRCd supports it. M
 A: It is possible your IRCd is not fully supported by DeltaProxy. Currently only a very small fraction of IRCd were tested for compatibility with DeltaProxy, and it's possible your one is not. Please, feel free to create bug reports on GitHub Issues!
 
 If you believe your issue fits neither of these categories, you can always get live support from developers of DeltaProxy. You can find me at my IRC server at `irc.nk.ax:+6697` SSL or `:6667` plaintext in #chat. My nickname is `kolya` there and I will assist you in any way I can.
+
+#### Q: Ident doesn't work properly!
+
+A: Enable and properly configure the [IdentdModule](https://github.com/kolya5544/DeltaProxy/tree/master/modules/IdentdModule)

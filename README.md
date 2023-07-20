@@ -49,6 +49,8 @@ Some commands implemented by default modules include:
 - /blacklist by WordBlacklistModule
 - /admin by AdminConfigModule
 
+There is also a command you can type into DeltaProxy's CLI: `exit`. **Please use `exit` for safe DeltaProxy shutdowns.**
+
 ## Developing for DeltaProxy
 
 DeltaProxy modules are separate projects that are compiled to DLL and are dynamically loaded by DeltaProxy at launch. You can find a comprehensive and complete guide on developing DeltaProxy modules [here](https://github.com/kolya5544/DeltaProxy/blob/master/DEVELOPMENT.md). Alternatively, you can learn how modules work by looking at examples. A good and well-documented example is [PronounsModule](https://github.com/kolya5544/DeltaProxy/blob/master/modules/PronounsModule/PronounsModule.cs)

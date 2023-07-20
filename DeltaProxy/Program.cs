@@ -283,12 +283,10 @@ namespace DeltaProxy
                 }
             } catch (Exception ex)
             {
-                Log($"exception code");
                 Log($"{ex.Message} {ex.StackTrace}");
                 if (ex.InnerException is not null) Log($"{ex.InnerException.Message} {ex.InnerException.StackTrace}");
             } finally
             {
-                Log($"finally code");
                 lock (allConnections) allConnections.Remove(info);
                 lock (connectedUsers) connectedUsers.Remove(info);
                 lock (channelUsers)
@@ -320,7 +318,7 @@ namespace DeltaProxy
             Log($"Terminating DeltaProxy... Disconnecting all clients.");
             lock (allConnections) allConnections.ForEach((z) =>
             {
-                new Thread(() => { z.SendRawClientMessage($"ERROR :DeltaProxy is shutting down!"); z.Client.Close(); }).Start();
+                new Thread(() => { z.SendRawClientMessage($"ERROR :* * * [SYSTEM] DeltaProxy is shutting down!"); z.Client.Close(); }).Start();
             });
             while (true)
             {
