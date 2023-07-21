@@ -18,6 +18,8 @@ using System.Net.Mail;
 using DeltaProxy.modules.Bans;
 using DeltaProxy.modules.MessageBacklog;
 using static DeltaProxy.ModuleHandler;
+using System.Collections.Generic;
+using System.Security.Cryptography;
 
 namespace DeltaProxy.modules.VKBridge
 {
@@ -52,6 +54,27 @@ namespace DeltaProxy.modules.VKBridge
         {
             var msgSplit = msg.SplitMessage();
 
+            if (msgSplit.Assert("WHOIS", 0) && msgSplit.AssertCount(2, true))
+            {
+                string nickname = msgSplit[1].Trim(':');
+
+
+                SharedVKUserHolder? vm;
+                lock (vkMembers) vm = vkMembers.FirstOrDefault((z) =>
+                {
+                    return z.screenName.Equals(nickname, StringComparison.OrdinalIgnoreCase);
+                });
+
+                if (vm is not null)
+                {
+                    // insert our own WHOIS...
+                    info.SendClientMessage($"311 {info.Nickname} {vm.screenName} {(vm.isBot ? "vkbot" : "vkuser")} vkbridge-user * :VK user {vm.fullName} from https://vk.com/{vm.screenName}");
+                    info.SendClientMessage($"319 {info.Nickname} {vm.screenName} :{(vm.isOnline ? "+" : "")}{cfg.ircChat}");
+                    info.SendClientMessage($"671 {info.Nickname} {vm.screenName} :is using a Secure Connection");
+                    info.SendClientMessage($"318 {info.Nickname} {vm.screenName} :End of /WHOIS list.");
+                    return ModuleResponse.BLOCK_PASS;
+                }
+            }
             if (msgSplit.Assert("NICK", 0)) // expecting NICK
             {
                 if (info.Nickname.StartsWith(cfg.collisionPrefix)) // cannot allow it! sorry.
@@ -64,7 +87,7 @@ namespace DeltaProxy.modules.VKBridge
                 // need to handle a specific edge case with nickname collision first
                 lock (vkMembers)
                 {
-                    SharedVKUserHolder vm;
+                    SharedVKUserHolder? vm;
                     lock (vkMembers) vm = vkMembers.FirstOrDefault((z) =>
                     {
                         return z.screenName.Equals(info.Nickname, StringComparison.OrdinalIgnoreCase);
@@ -212,7 +235,6 @@ namespace DeltaProxy.modules.VKBridge
                 {
                     info.SendClientMessage($"353 {info.Nickname} = {cfg.ircChat} :{info.GetProperNickname(z)}");
                 });
-                
             }
 
             return ModuleResponse.PASS;

@@ -69,7 +69,7 @@ namespace DeltaProxy.modules.VKBridge
             {
                 if (hashedMembers.ContainsKey(z.id)) return;
                 // we got a new member! tell everyone they've joined, but don't flush yet.
-                lock (bridgeMembers) { bridgeMembers.ForEach((x) => { lock (x.clientQueue) x.clientQueue.Add($"{IRCExtensions.GetTimeString(x)}:{z.GetActualUser(x, false, true)} JOIN {VKBridgeModule.cfg.ircChat} * :{z.fullName}"); }); vkMembers.Add(z); }
+                lock (bridgeMembers) { bridgeMembers.ForEach((x) => { lock (x.clientQueue) x.clientQueue.Add($"{IRCExtensions.GetTimeString(x)}:{z.GetActualUser(x, false, true)} JOIN {VKBridgeModule.cfg.ircChat} * :VK user {z.fullName} from https://vk.com/{z.screenName}"); }); vkMembers.Add(z); }
 
                 // hash
                 hashedMembers.Add(z.id, z);
