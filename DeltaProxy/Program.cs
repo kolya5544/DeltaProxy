@@ -287,6 +287,7 @@ namespace DeltaProxy
                 if (ex.InnerException is not null) Log($"{ex.InnerException.Message} {ex.InnerException.StackTrace}");
             } finally
             {
+                info.Terminated = true;
                 lock (allConnections) allConnections.Remove(info);
                 lock (connectedUsers) connectedUsers.Remove(info);
                 lock (channelUsers)

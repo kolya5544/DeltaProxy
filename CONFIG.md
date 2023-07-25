@@ -117,3 +117,7 @@ If you believe your issue fits neither of these categories, you can always get l
 #### Q: Ident doesn't work properly!
 
 A: Enable and properly configure the [IdentdModule](https://github.com/kolya5544/DeltaProxy/tree/master/modules/IdentdModule)
+
+#### Q: NickServ auth using certificate fingerprint doesn't work!
+
+A: You will need to re-add certificates to NickServ after installing DeltaProxy. Unfortunately, it is TLS limitation and we cannot fix this. Alternatively, use an IRCd that supports `certfp-sha-256` WebIRC flag.

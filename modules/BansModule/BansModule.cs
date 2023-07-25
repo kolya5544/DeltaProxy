@@ -42,7 +42,7 @@ namespace DeltaProxy.modules.Bans
                 string vhost = subject.Item3;
 
                 // first and foremost
-                lock (connectedUsers) connectedUsers.RemoveAll((z) => z.Nickname == nickname);
+                lock (connectedUsers) connectedUsers.Where((z) => z.Nickname == nickname).ToList().ForEach((z) => { z.Terminated = true; connectedUsers.Remove(z); });
 
                 string quitReason = msgSplit.ToArray().Join(2).Trim(':');
 

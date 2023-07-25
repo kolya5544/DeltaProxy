@@ -39,6 +39,13 @@ namespace DeltaProxy.modules
             {
                 info.Nickname = info._oldNickname;
             }
+
+            if (msgSplit.AssertCorrectPerson(info) && msgSplit.Assert("NICK", 1) && msgSplit.AssertCount(3, true)) // expects server to change your nickname
+            {
+                string newNickname = msgSplit[2].Trim(':');
+                info.Nickname = newNickname;
+            }
+
             if (msgSplit.AssertCorrectPerson(info) && msgSplit.Assert("JOIN", 1)) // expects a join confirmation
             {
                 string channelName = msgSplit[2].Trim(':');
@@ -53,7 +60,6 @@ namespace DeltaProxy.modules
                 RemoveUserFromChannel(info, channelName);
             }
 
-            // :kolya!Kolya@iktm-FA239AD0.nk.ax KICK #chat-ru kolya123 :kolya
             if (msgSplit.AssertCorrectPerson(info) && msgSplit.Assert("KICK", 1) && msgSplit.AssertCount(4, true)) // expects a kick confirmation
             {
                 string channelName = msgSplit[2];
@@ -212,6 +218,8 @@ namespace DeltaProxy.modules
             public int localPort; // port uses uses OUR side to connect to PROXY (like 6667)
 
             public bool WebAuthed = false;
+
+            public bool Terminated = false;
 
             public void FlushServerQueue()
             {

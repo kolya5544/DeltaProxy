@@ -56,14 +56,17 @@ namespace DeltaProxy.modules.VKBridge
 
             if (msgSplit.Assert("WHOIS", 0) && msgSplit.AssertCount(2, true))
             {
-                string nickname = msgSplit[1].Trim(':');
+                string nickname = msgSplit[1].Trim(':'); if (nickname == info.Nickname && msgSplit.AssertCount(3, true)) nickname = msgSplit[2].Trim(':');
+                string[] nicknames = nickname.Split(","); nicknames = nicknames.Take(Math.Min(nicknames.Length, 5)).ToArray();
 
-
-                SharedVKUserHolder? vm;
-                lock (vkMembers) vm = vkMembers.FirstOrDefault((z) =>
-                {
-                    return z.screenName.Equals(nickname, StringComparison.OrdinalIgnoreCase);
-                });
+                SharedVKUserHolder? vm = null;
+                foreach (var nk in nicknames) {
+                    lock (vkMembers) vm = vkMembers.FirstOrDefault((z) =>
+                    {
+                        return z.screenName.Equals(nk, StringComparison.OrdinalIgnoreCase);
+                    });
+                    if (vm is not null) break;
+                }
 
                 if (vm is not null)
                 {
