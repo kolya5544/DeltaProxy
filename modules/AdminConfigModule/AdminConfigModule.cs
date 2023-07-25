@@ -174,6 +174,10 @@ namespace DeltaProxy.modules.AdminConfig
 
         private static void LoadModule(ConnectionInfo info, string moduleName)
         {
+            ModuleHandler.BlockAllThreads = true;
+
+            Thread.Sleep(500);
+
             // let's first try to load the assembly
             var newModule = ModuleHandler.LoadModule($"modules/{moduleName}.dll");
 
@@ -198,10 +202,18 @@ namespace DeltaProxy.modules.AdminConfig
             {
                 info.SendClientMessage("DeltaProxy", info.Nickname, $"[A] = Fatal error encountered while trying to enable module '{newModule.Name}'!");
             }
+
+            Thread.Sleep(500);
+
+            ModuleHandler.BlockAllThreads = false;
         }
 
         public static void UnloadModule(ConnectionInfo info, AdminChoice ac)
         {
+            ModuleHandler.BlockAllThreads = true;
+
+            Thread.Sleep(500);
+
             if (ac.ModuleChosen is null)
             {
                 info.SendClientMessage("DeltaProxy", info.Nickname, cfg.error_no_module); return;
@@ -219,6 +231,10 @@ namespace DeltaProxy.modules.AdminConfig
             if (disableMethod is not null) disableMethod.Invoke(null, null);
 
             lock (ModuleHandler.modules) ModuleHandler.modules.RemoveAll((z) => z.Name == ac.ModuleChosen.Name);
+
+            Thread.Sleep(500);
+
+            ModuleHandler.BlockAllThreads = false;
         }
 
         private static void ReloadModule(ConnectionInfo info, AdminChoice ac)
@@ -243,6 +259,10 @@ namespace DeltaProxy.modules.AdminConfig
 
         public static void ToggleModule(ConnectionInfo info, AdminChoice ac, bool enable)
         {
+            ModuleHandler.BlockAllThreads = true;
+
+            Thread.Sleep(500);
+
             if (ac.ModuleChosen is null)
             {
                 info.SendClientMessage("DeltaProxy", info.Nickname, cfg.error_no_module); return;
@@ -270,6 +290,10 @@ namespace DeltaProxy.modules.AdminConfig
             {
                 info.SendClientMessage("DeltaProxy", info.Nickname, enable ? cfg.error_cant_enable : cfg.error_cant_disable); return;
             }
+
+            Thread.Sleep(500);
+
+            ModuleHandler.BlockAllThreads = false;
         }
 
         public static void OnEnable()

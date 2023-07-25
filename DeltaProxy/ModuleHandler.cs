@@ -38,6 +38,8 @@ namespace DeltaProxy
             BLOCK_ALL = 8, // blocks the response from reaching the next module or server/client. No queues will be flushed
         }
 
+        public static bool BlockAllThreads = false; // used for module reloads. Blocks both server and client threads from proceeding for the duration of module reload.
+
         /// <summary>
         /// Enables all modules by calling OnEnable within enabled modules.
         /// </summary>
@@ -185,6 +187,11 @@ namespace DeltaProxy
         /// <param name="callingMethod">If message was sent by a module, rather than a client, this should be equal to module's name</param>
         public static ModuleResponse ProcessServerMessage(ConnectionInfo info, ref string msg, Type callingMethod = null)
         {
+            while (BlockAllThreads)
+            {
+                Thread.Sleep(1000); // waiting for threads to get unlocked!
+            }
+
             // making sure the msg doesn't contain @ prefixes like @time=2023-07-09T13:25:37.688Z
             string prefix = null;
             if (msg.StartsWith("@")) { prefix = msg.SplitMessage()[0]; msg = msg.SplitMessage().ToArray().Join(1); }
@@ -229,6 +236,11 @@ namespace DeltaProxy
         /// <returns>Whether or not the message should be forwarded to server.</returns>
         public static ModuleResponse ProcessClientMessage(ConnectionInfo info, ref string msg, Type callingMethod = null)
         {
+            while (BlockAllThreads)
+            {
+                Thread.Sleep(1000); // waiting for threads to get unlocked!
+            }
+
             ModuleResponse mrp = ModuleResponse.PASS;
 
             object[] args = new object[] { info, msg };
