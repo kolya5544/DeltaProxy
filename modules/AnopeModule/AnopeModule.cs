@@ -22,6 +22,7 @@ namespace DeltaProxy.modules
 
         public static AnopeStatus GetStatus(ConnectionInfo info)
         {
+            if (!cfg.anopePresent) return AnopeStatus.RegisteredAuth;
             if (!users.ContainsKey(info)) return AnopeStatus.Unknown;
             return users[info];
         }
@@ -66,6 +67,7 @@ namespace DeltaProxy.modules
                 if (realMsg.StartsWith("STATUS") && rSplt.AssertCount(3, true))
                 {
                     bool block = users[info] == AnopeStatus.Unknown;
+                    lock (requestees) if (requestees.Contains(info)) block = true;
 
                     string nickname = rSplt[1];
                     if (info.Nickname != nickname) return ModuleResponse.PASS;

@@ -327,11 +327,11 @@ namespace DeltaProxy.modules.WordBlacklist
         {
             public Offender(ConnectionInfo ci)
             {
-                var properties = typeof(ConnectionInfo).GetProperties();
-                foreach (var property in properties)
+                var fields = typeof(ConnectionInfo).GetFields();
+                foreach (var field in fields)
                 {
-                    var value = property.GetValue(ci);
-                    property.SetValue(this, value);
+                    var value = field.GetValue(ci);
+                    field.SetValue(this, value);
                 }
             }
 
