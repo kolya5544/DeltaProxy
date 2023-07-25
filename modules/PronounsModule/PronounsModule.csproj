@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\DeltaProxy\DeltaProxy.csproj" />
+    <ProjectReference Include="..\AnopeModule\AnopeModule.csproj" />
   </ItemGroup>
 
   <Target Name="PostBuild" AfterTargets="PostBuildEvent">

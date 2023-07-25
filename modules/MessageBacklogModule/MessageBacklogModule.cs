@@ -1,4 +1,5 @@
-﻿using System.Threading.Tasks.Dataflow;
+﻿using System.Text;
+using System.Threading.Tasks.Dataflow;
 using static DeltaProxy.ModuleHandler;
 using static DeltaProxy.modules.ConnectionInfoHolderModule;
 
@@ -36,10 +37,14 @@ namespace DeltaProxy.modules.MessageBacklog
 
                     lock (info.postClientQueue)
                     {
+                        var bigMsg = new StringBuilder();
+
                         chan.messages.ForEach((z) =>
                         {
-                            info.postClientQueue.Add($"{IRCExtensions.GetTimeString(info, z.timestamp)}:{info.GetProperNickname(z.sender)} PRIVMSG {channelName} :{z.message}");
+                            bigMsg.Append($"{IRCExtensions.GetTimeString(info, z.timestamp)}:{info.GetProperNickname(z.sender)} PRIVMSG {channelName} :{z.message}\n");
                         });
+
+                        if (bigMsg.Length > 0) info.postClientQueue.Add(bigMsg.ToString().Trim('\n'));
                     }
                 }
             }

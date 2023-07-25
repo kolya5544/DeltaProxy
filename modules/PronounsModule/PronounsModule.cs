@@ -1,5 +1,6 @@
 ﻿using DeltaProxy;
 using System.Text.RegularExpressions;
+using DeltaProxy.modules.Pronouns;
 using static DeltaProxy.ModuleHandler;
 using static DeltaProxy.modules.ConnectionInfoHolderModule;
 
@@ -63,6 +64,14 @@ namespace DeltaProxy.modules.Pronouns
 
             if (msgSplit.Assert("PRONOUNS", 0) && info.Nickname is not null) // here we make sure user executed /PRONOUNS, as well as authed with NICK before.
             {
+                // Anope integration! You can use AnopeModule to check whether or not a user is authed to do some action
+                var status = AnopeModule.GetStatus(info);
+                if (status != AnopeModule.AnopeStatus.Unregistered && status != AnopeModule.AnopeStatus.RegisteredAuth)
+                {
+                    info.SendClientMessage("DeltaProxy", info.Nickname, $"[Pronouns] - You have to be authed to use this command!");
+                    return ModuleResponse.BLOCK_PASS;
+                }
+
                 if (msgSplit.AssertCount(1)) // this is the same as msgSplit.Count == 1. You can use any form of this expression you like.
                 {
                     info.SendClientMessage("DeltaProxy", info.Nickname, $"[Pronouns] - To set a pronouns, use /PRONOUNS [pronouns], or /PRONOUNS clear. " +

@@ -143,6 +143,10 @@ namespace DeltaProxy.modules
             {
                 info.Realname = msgSplit.ToArray().Join(1);
             }
+            if (msgSplit.Assert("438", 1)) // nickname change declined
+            {
+                info.Nickname = info._oldNickname;
+            }
 
             if (!info.WebAuthed) return ModuleResponse.BLOCK_ALL;
 
