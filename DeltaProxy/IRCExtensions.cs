@@ -27,6 +27,30 @@ namespace DeltaProxy
             return splet.Count == count || (orMore && splet.Count >= count);
         }
 
+        public static string[] SplitLong(this string msg)
+        {
+            int encLength = Encoding.UTF8.GetByteCount(msg);
+            int cutLength = (encLength == msg.Length) ? 440 : 210 - 20;
+
+            if (msg.Length < cutLength)
+            {
+                return msg.Split('\n');
+            }
+            else
+            {
+                var m = msg.Replace("\n", " ");
+                List<string> parts = new();
+                for (int i = 0; i < (m.Length / cutLength) + 1; i++)
+                {
+                    int start = i * cutLength;
+                    int length = Math.Abs(Math.Min(cutLength, m.Length - cutLength * i));
+
+                    parts.Add(m.Substring(start, length));
+                }
+                return parts.ToArray();
+            }
+        }
+
         public static string GetLongString(this string message)
         {
             int index = message.IndexOf(':');

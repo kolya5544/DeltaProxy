@@ -182,7 +182,8 @@ namespace DeltaProxy.modules.VKBridge
                 lock (msgReceiver.clientQueue) msgReceiver.clientQueue.Add($"{IRCExtensions.GetTimeString(msgReceiver)}:{actualSender.GetActualUser(msgReceiver, false)} PRIVMSG {msgReceiver.Nickname} :{message}");
                 bot.SendMessage(sender, $"Successfully sent the private message!");
                 return;
-            } else if (text.StartsWith("/ignore") && mS.AssertCount(2))
+            }
+            else if (text.StartsWith("/ignore") && mS.AssertCount(2))
             {
                 string whom = mS[1];
 
@@ -194,7 +195,8 @@ namespace DeltaProxy.modules.VKBridge
                     newStatus = true;
                     ignores = new Ignore() { createdOnIrc = false, id = sender, name = whom };
                     lock (VKBridgeModule.db.lockObject) VKBridgeModule.db.ignores.Add(ignores);
-                } else
+                }
+                else
                 {
                     lock (VKBridgeModule.db.lockObject) VKBridgeModule.db.ignores.Remove(ignores);
                 }
@@ -448,7 +450,7 @@ namespace DeltaProxy.modules.VKBridge
             string safeForIrc = RemoveBadChar(text).Clamp(1024, 7);
 
             string finalMessage = string.IsNullOrEmpty(safeForIrc) ? "(пустое сообщение)" : safeForIrc;
-            string[] finalMsgSplit = finalMessage.Split('\n'); 
+            string[] finalMsgSplit = finalMessage.SplitLong();
             string finalSender = $"{actualSender.screenName}!{(actualSender.isBot ? "vkbot" : "vkuser")}@vkbridge-user";
             finalMsgSplit.ToList().ForEach((x) =>
             {
@@ -458,7 +460,10 @@ namespace DeltaProxy.modules.VKBridge
             {
                 finalMsgSplit.ToList().ForEach((x) =>
                 {
-                    lock (z.clientQueue) z.clientQueue.Add($"{IRCExtensions.GetTimeString(z)}:{z.GetProperNickname(finalSender)} PRIVMSG {VKBridgeModule.cfg.ircChat} :{x}");
+                    lock (z.clientQueue)
+                    {
+                        z.clientQueue.Add($"{IRCExtensions.GetTimeString(z)}:{z.GetProperNickname(finalSender)} PRIVMSG {VKBridgeModule.cfg.ircChat} :{x}");
+                    }
                 });
                 z.FlushClientQueueAsync();
             });
