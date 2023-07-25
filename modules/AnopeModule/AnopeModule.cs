@@ -11,11 +11,13 @@ namespace DeltaProxy.modules
 
         public static ModuleConfig cfg;
         public static Dictionary<ConnectionInfo, AnopeStatus> users;
+        public static List<ConnectionInfo> requestees;
 
         public static void OnEnable()
         {
             cfg = ModuleConfig.LoadConfig("mod_anope.json");
             users = new Dictionary<ConnectionInfo, AnopeStatus>();
+            requestees = new List<ConnectionInfo>();
         }
 
         public static AnopeStatus GetStatus(ConnectionInfo info)
@@ -40,6 +42,7 @@ namespace DeltaProxy.modules
                         string newNickname = msgSplit[1];
                         users[info] = AnopeStatus.Unknown; // we don't know what user is up to!
                         lock (info.postServerQueue) info.postServerQueue.Add($"PRIVMSG NickServ STATUS {newNickname}");
+                        lock (requestees) if (!requestees.Contains(info)) requestees.Add(info);
                     }
                 }
             }
@@ -82,6 +85,8 @@ namespace DeltaProxy.modules
                         }
                     }
 
+                    lock (requestees) requestees.Remove(info);
+
                     if (block) return ModuleResponse.BLOCK_MODULES;
                 }
             }
@@ -96,6 +101,7 @@ namespace DeltaProxy.modules
             {
                 users[info] = AnopeStatus.Unknown; // uncertainty.
                 lock (info.postServerQueue) info.postServerQueue.Add($"PRIVMSG NickServ STATUS {info.Nickname}");
+                lock (requestees) if (!requestees.Contains(info)) requestees.Add(info);
             }
 
             return ModuleResponse.PASS;

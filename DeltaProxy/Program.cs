@@ -22,6 +22,11 @@ namespace DeltaProxy
             Directory.CreateDirectory("certs");
             Directory.CreateDirectory("usercerts");
 
+            Console.CancelKeyPress += delegate (object? sender, ConsoleCancelEventArgs e) {
+                e.Cancel = true;
+                ShutdownDeltaProxy();
+            };
+
             Log($"Enabling modules...");
             ModuleHandler.EnableModules();
 
@@ -328,6 +333,7 @@ namespace DeltaProxy
                 if (connectedCount == 0) break;
                 Thread.Sleep(100);
             }
+            Thread.Sleep(5000);
             Log($"Terminating DeltaProxy... Disabling all modules.");
             ModuleHandler.ShutdownAllModules();
             Log($"Terminating DeltaProxy... Success!");
