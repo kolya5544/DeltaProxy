@@ -5,6 +5,7 @@ using System.Security.Cryptography.X509Certificates;
 using System.Net.Security;
 using static DeltaProxy.modules.ConnectionInfoHolderModule;
 using System.Security.Cryptography;
+using System.ComponentModel;
 
 namespace DeltaProxy
 {
@@ -219,7 +220,7 @@ namespace DeltaProxy
                         while (true)
                         {
                             var cmd = client_sr.ReadLine();
-                            if (string.IsNullOrEmpty(cmd)) throw new Exception("Broken pipe");
+                            if (cmd is null) throw new Exception("Broken pipe");
                             if (cfg.LogRaw) Log($"<< {cmd}");
 
                             // check all CLIENT-side modules
@@ -256,7 +257,7 @@ namespace DeltaProxy
                 while (true)
                 {
                     var cmd = await server_sr.ReadLineAsync().WaitAsync(exceptionToken.Token);
-                    if (string.IsNullOrEmpty(cmd)) throw new Exception("Broken pipe");
+                    if (cmd is null) throw new Exception("Broken pipe");
                     if (clientException is not null) throw clientException;
                     if (cfg.LogRaw) Log($">> {cmd}");
 
