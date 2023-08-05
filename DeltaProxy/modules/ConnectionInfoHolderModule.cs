@@ -73,9 +73,16 @@ namespace DeltaProxy.modules
             return ModuleResponse.PASS;
         }
 
-        public static ModuleResponse ResolveClientMessage(ConnectionInfo info, string msg)
+        public static ModuleResponse ResolveClientMessage(ConnectionInfo info, ref string msg)
         {
             var msgSplit = msg.SplitMessage();
+
+            // handle IRCCloud IRCv3 whatever shit where commands begin with :nickname!username@vhost
+            if (msgSplit.AssertCorrectPerson(info))
+            {
+                msg = msg.Remove(0, msgSplit.First().Length + 1); // lol
+            }
+
             if (msgSplit.Assert("NICK", 0) && msgSplit.AssertCount(2)) // Expects NICK command from user
             {
                 if (msgSplit[1].Equals("deltaproxy", StringComparison.OrdinalIgnoreCase))

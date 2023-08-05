@@ -241,6 +241,10 @@ namespace DeltaProxy
                 Thread.Sleep(1000); // waiting for threads to get unlocked!
             }
 
+            // making sure the msg doesn't contain @ prefixes like @time=2023-07-09T13:25:37.688Z
+            string prefix = null;
+            if (msg.StartsWith("@")) { prefix = msg.SplitMessage()[0]; msg = msg.SplitMessage().ToArray().Join(1); }
+
             ModuleResponse mrp = ModuleResponse.PASS;
 
             object[] args = new object[] { info, msg };
@@ -264,6 +268,9 @@ namespace DeltaProxy
                     Program.Log($"Fatal Exception by module {method.DeclaringType.Name}: {ex.Message} {ex.StackTrace} {(ex.InnerException is not null ? $"{ex.InnerException.Message} {ex.InnerException.StackTrace}" : "")}");
                 }
             }
+
+            // return the prefix string for the message
+            if (!string.IsNullOrEmpty(prefix)) { msg = $"{prefix} {msg}"; }
 
             return mrp;
         }
