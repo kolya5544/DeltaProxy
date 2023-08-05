@@ -82,7 +82,7 @@ namespace DeltaProxy
             StreamWriter server_sw;
             StreamReader server_sr;
 
-            int defaultTimeout = 7000;
+            int defaultTimeout = 8000;
             int authedTimeout = 160000;
 
             string ip_address = ((IPEndPoint)client.Client.RemoteEndPoint).Address.ToString();
@@ -264,15 +264,15 @@ namespace DeltaProxy
                     // check all SERVER-side modules
                     var moduleResponse = ModuleHandler.ProcessServerMessage(info, ref cmd);
 
+                    sentCounter += 1;
+                    if (sentCounter >= 5)
+                    {
+                        client_stream.ReadTimeout = authedTimeout;
+                        client_stream.WriteTimeout = authedTimeout;
+                    }
+
                     if (moduleResponse == ModuleHandler.ModuleResponse.PASS)
                     {
-                        sentCounter += 1;
-                        if (sentCounter == 5)
-                        {
-                            client_stream.ReadTimeout = authedTimeout;
-                            client_stream.WriteTimeout = authedTimeout;
-                        }
-
                         lock (info.clientQueue) info.clientQueue.Add(cmd);
                         info.FlushClientQueue();
                         info.FlushPostClientQueue(); // this is where we send messages buffered by plugins to be sent AFTER the initial message
@@ -323,7 +323,7 @@ namespace DeltaProxy
         {
             serverActiveToken.Cancel();
             Log($"Terminating DeltaProxy... Disconnecting all clients.");
-            lock (allConnections) allConnections.ForEach((z) =>
+            lock (allConnections) allConnections.Where((z) => z.Client is not null).ToList().ForEach((z) =>
             {
                 new Thread(() => { z.SendRawClientMessage($"ERROR :* * * [SYSTEM] DeltaProxy is shutting down!"); z.Client.Close(); }).Start();
             });
