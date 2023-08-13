@@ -118,6 +118,56 @@ namespace DeltaProxy.modules.VKBridge
             lock (bridgeMembers) bridgeMembers.ForEach((x) => x.FlushClientQueueAsync());
         }
 
+        /// <summary>
+        /// Removes all common tracking techniques implemented by different websites
+        /// </summary>
+        /// <param name="str"></param>
+        /// <returns></returns>
+        public static string RemoveTrackingLinks(string str)
+        {
+            // uses this regex which also matches times like 09:00 and broken URLs like a.r.
+            // it does work for our purposes, so...
+            if (!cfg.removeTrackingLinks) return str;
+            return Regex.Replace(str, "([\\w+]+\\:\\/\\/)?([\\w\\d-]+\\.)*[\\w-]+[\\.\\:]\\w+([\\/\\?\\=\\&\\#\\.]?[\\w\\—-]+)*\\/?", new MatchEvaluator(TrackMatchEvaluator));
+        }
+
+        public static string TrackMatchEvaluator(Match m)
+        {
+            var url = m.Value; // get our URL
+
+            // remove YTube's ?feature=
+            if (url.Contains("youtube") && url.Contains("?feature="))
+            {
+                url = Regex.Replace(url, "(?:^|[?&])feature=([^&]*)", "");
+            }
+
+            // remove Amazon's tracking features
+            if (url.Contains("amazon") && url.Contains("/ref="))
+            {
+                url = url.Remove(url.IndexOf("/ref="));
+            }
+
+            // remove UTM tracking tags
+            if (url.Contains("utm_"))
+            {
+                url = Regex.Replace(url, "(?:^|[?&])utm_source=([^&]*)", "");
+                url = Regex.Replace(url, "(?:^|[?&])utm_medium=([^&]*)", "");
+                url = Regex.Replace(url, "(?:^|[?&])utm_campaign=([^&]*)", "");
+                url = Regex.Replace(url, "(?:^|[?&])utm_term=([^&]*)", "");
+                url = Regex.Replace(url, "(?:^|[?&])utm_content=([^&]*)", "");
+            }
+
+            // fix URL if query begins with &
+            var rgStAmpersand = new Regex("(?:^|[?&])([^&]*)=([^&]*)");
+            var matches = rgStAmpersand.Matches(url);
+            if (matches.Count == 0) return url;
+            if (url.StartsWith(matches.First().Value)) return url; // matches the beginning of the string - all is fine
+            if (url.IndexOf("&") == -1) return url; // hm.
+            url = rgStAmpersand.Replace(url, matches.First().Value.Replace("&", "?"), 1); // replace & with ?
+
+            return url;
+        }
+
         public static void HandleUpdate(Update u)
         {
             // this code was taken from my other project, LavaBridge
@@ -447,7 +497,7 @@ namespace DeltaProxy.modules.VKBridge
                 }
             }
 
-            string safeForIrc = RemoveBadChar(text).Clamp(1024, 7);
+            string safeForIrc = RemoveBadChar(RemoveTrackingLinks(text)).Clamp(1024, 7);
 
             string finalMessage = string.IsNullOrEmpty(safeForIrc) ? "(пустое сообщение)" : safeForIrc;
             string[] finalMsgSplit = finalMessage.SplitLong();

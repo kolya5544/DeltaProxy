@@ -431,6 +431,8 @@ namespace DeltaProxy.modules.VKBridge
             public bool useBacklog = true; // uses backlog using MessageBacklogModule
             public long backlogStoreTime = 3600 * 120;
             public long backlogStoreAmount = 100;
+
+            public bool removeTrackingLinks = true;
         }
 
         public class Database : DatabaseBase<Database>
