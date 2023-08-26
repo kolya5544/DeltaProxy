@@ -93,7 +93,7 @@ namespace DeltaProxy.modules
 
                 info._oldNickname = info.Nickname;
                 if (info.Nickname is not null) info.ChangedNickname = true;
-                info.Nickname = msgSplit[1];
+                info.Nickname = msgSplit[1].Trim(':');
 
                 // now this is important, we shouldn't let server see this message, but we should let other modules do so.
                 // important for webIRC auth

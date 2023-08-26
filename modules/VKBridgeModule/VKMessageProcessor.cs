@@ -136,9 +136,10 @@ namespace DeltaProxy.modules.VKBridge
             var url = m.Value; // get our URL
 
             // remove YTube's ?feature=
-            if (url.Contains("youtube") && url.Contains("?feature="))
+            if (url.Contains("youtube") && (url.Contains("?feature=") || url.Contains("?si=")))
             {
                 url = Regex.Replace(url, "(?:^|[?&])feature=([^&]*)", "");
+                url = Regex.Replace(url, "(?:^|[?&])si=([^&]*)", "");
             }
 
             // remove Amazon's tracking features
@@ -310,7 +311,7 @@ namespace DeltaProxy.modules.VKBridge
                 return;
             }
 
-            var safeName = lc.AcquireName(sender);
+            var safeName = "";
 
             var regex = new Regex(@"\[(id|club)(\d*)\|([^\]]*)]");
             var matches = regex.Matches(text).ToList();
@@ -326,8 +327,22 @@ namespace DeltaProxy.modules.VKBridge
             if (u.Object.Message.ReplyMessage is not null)
             {
                 var tid = u.Object.Message.ReplyMessage;
-                var repliedTo = u.Object.Message.ReplyMessage.FromId == -VKBridgeModule.cfg.vkGroup ? (tid.Text.StartsWith("=>") ? VKBridgeModule.cfg.vkBotName : tid.Text.Split('<')[1].Split('>')[0]) : lc.AcquireName(tid.FromId);
-                safeName += $"->{repliedTo}";
+                var repliedTo = vkMembers.FirstOrDefault((z) => z.id == u.Object.Message.ReplyMessage.FromId);
+                string repliedToName = "";
+                if (u.Object.Message.ReplyMessage.FromId == -cfg.vkGroup)
+                {
+                    if (tid.Text.StartsWith("=>"))
+                    {
+                        repliedToName = cfg.vkBotName;
+                    } else
+                    {
+                        repliedToName = tid.Text.Split('<')[1].Split('>')[0];
+                    }
+                } else
+                {
+                    if (repliedTo is not null) repliedToName = repliedTo.screenName;
+                }
+                if (!string.IsNullOrEmpty(repliedToName)) safeName += $"{repliedToName}: ";
             }
 
             var m = u.Object.Message;
@@ -499,7 +514,7 @@ namespace DeltaProxy.modules.VKBridge
 
             string safeForIrc = RemoveBadChar(RemoveTrackingLinks(text)).Clamp(1024, 7);
 
-            string finalMessage = string.IsNullOrEmpty(safeForIrc) ? "(пустое сообщение)" : safeForIrc;
+            string finalMessage = string.IsNullOrEmpty(safeForIrc) ? "(пустое сообщение)" : $"{safeName}{safeForIrc}";
             string[] finalMsgSplit = finalMessage.SplitLong();
             string finalSender = $"{actualSender.screenName}!{(actualSender.isBot ? "vkbot" : "vkuser")}@vkbridge-user";
             finalMsgSplit.ToList().ForEach((x) =>
