@@ -150,7 +150,7 @@ namespace DeltaProxy.modules
             {
                 info.Realname = msgSplit.ToArray().Join(1);
             }
-            if (msgSplit.Assert("438", 1)) // nickname change declined
+            if (msgSplit.Assert("438", 1)) // nickname change declined. Possible race condition? Should look into it further.
             {
                 info.Nickname = info._oldNickname;
             }

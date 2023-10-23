@@ -1,6 +1,5 @@
 ﻿using DeltaProxy;
 using System.Text.RegularExpressions;
-using DeltaProxy.modules.Pronouns;
 using static DeltaProxy.ModuleHandler;
 using static DeltaProxy.modules.ConnectionInfoHolderModule;
 

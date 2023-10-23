@@ -2,6 +2,7 @@
 using System.Threading.Tasks.Dataflow;
 using static DeltaProxy.ModuleHandler;
 using static DeltaProxy.modules.ConnectionInfoHolderModule;
+using static DeltaProxy.modules.MessageBacklog.MessageBacklogModule.Database;
 
 namespace DeltaProxy.modules.MessageBacklog
 {
@@ -25,28 +26,7 @@ namespace DeltaProxy.modules.MessageBacklog
             {
                 string channelName = msgSplit[2];
 
-                Database.BacklogChannel chan;
-                lock (db.lockObject) chan = db.channels.FirstOrDefault((z) => z.channel == channelName);
-                if (chan is null) return ModuleResponse.PASS;
-
-                lock (chan.messages) // send backlog if any
-                {
-                    var currentTime = IRCExtensions.UnixMS();
-                    chan.messages.RemoveAll((z) => currentTime - z.timestamp > chan.maxStoreTime * 1000);
-                    chan.messages = chan.messages.TakeLast((int)chan.maxStoreAmount).ToList();
-
-                    lock (info.postClientQueue)
-                    {
-                        var bigMsg = new StringBuilder();
-
-                        chan.messages.ForEach((z) =>
-                        {
-                            bigMsg.Append($"{IRCExtensions.GetTimeString(info, z.timestamp)}:{info.GetProperNickname(z.sender)} PRIVMSG {channelName} :{z.message}\n");
-                        });
-
-                        if (bigMsg.Length > 0) info.postClientQueue.Add(bigMsg.ToString().Trim('\n'));
-                    }
-                }
+                PlaybackChannelHistory(info, channelName);
             }
 
             return ModuleResponse.PASS;
@@ -73,6 +53,54 @@ namespace DeltaProxy.modules.MessageBacklog
         {
             dbSaveToken.Cancel();
             db.SaveDatabase();
+        }
+
+        public static void PlaybackChannelHistory(ConnectionInfo victim, string channelName)
+        {
+            BacklogChannel chan;
+            lock (db.lockObject) chan = db.channels.FirstOrDefault((z) => z.channel == channelName);
+            if (chan is null) return;
+
+            lock (chan.messages) // send backlog if any
+            {
+                var currentTime = IRCExtensions.UnixMS();
+                chan.messages.RemoveAll((z) => currentTime - z.timestamp > chan.maxStoreTime * 1000);
+                chan.messages = chan.messages.TakeLast((int)chan.maxStoreAmount).ToList();
+
+                lock (victim.postClientQueue)
+                {
+                    var bigMsg = new StringBuilder();
+
+                    chan.messages.ForEach((z) =>
+                    {
+                        bigMsg.Append($"{IRCExtensions.GetTimeString(victim, z.timestamp)}:{victim.GetProperNickname(z.sender)} PRIVMSG {channelName} :{z.message}\n");
+                    });
+
+                    if (bigMsg.Length > 0) victim.postClientQueue.Add(bigMsg.ToString().Trim('\n'));
+                }
+            }
+        }
+
+        public static BacklogChannel AcquireChannel(string channelName, long maxStoreTime = 3600 * 120, long maxStoreAmount = 100)
+        {
+            BacklogChannel backlogChannel;
+
+            var chans = db.channels;
+            lock (chans) backlogChannel = chans.FirstOrDefault((z) => z.channel == channelName);
+            if (backlogChannel is null)
+            {
+                backlogChannel = new BacklogChannel();
+                lock (chans) chans.Add(backlogChannel);
+            }
+
+            lock (backlogChannel)
+            {
+                backlogChannel.channel = channelName;
+                backlogChannel.maxStoreTime = maxStoreTime;
+                backlogChannel.maxStoreAmount = maxStoreAmount;
+            }
+
+            return backlogChannel;
         }
 
         public class ModuleConfig : ConfigBase<ModuleConfig>

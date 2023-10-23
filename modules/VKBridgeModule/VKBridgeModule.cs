@@ -54,6 +54,8 @@ namespace DeltaProxy.modules.VKBridge
         {
             var msgSplit = msg.SplitMessage();
 
+            if (info.Nickname is null || info.Username is null) return ModuleResponse.PASS; // don't let non-registered connections through!
+
             if (msgSplit.Assert("WHOIS", 0) && msgSplit.AssertCount(2, true))
             {
                 string nickname = msgSplit[1].Trim(':'); if (nickname == info.Nickname && msgSplit.AssertCount(3, true)) nickname = msgSplit[2].Trim(':');
@@ -280,19 +282,7 @@ namespace DeltaProxy.modules.VKBridge
             {
                 if (cfg.useBacklog)
                 {
-                    var chans = MessageBacklogModule.db.channels;
-                    lock (chans) backlogChannel = chans.FirstOrDefault((z) => z.channel == cfg.ircChat);
-                    if (backlogChannel is null)
-                    {
-                        backlogChannel = new MessageBacklogModule.Database.BacklogChannel();
-                        lock (chans) chans.Add(backlogChannel);
-                    }
-                    lock (backlogChannel)
-                    {
-                        backlogChannel.channel = cfg.ircChat;
-                        backlogChannel.maxStoreTime = cfg.backlogStoreTime;
-                        backlogChannel.maxStoreAmount = cfg.backlogStoreAmount;
-                    }
+                    backlogChannel = MessageBacklogModule.AcquireChannel(cfg.ircChat, cfg.backlogStoreTime, cfg.backlogStoreAmount);
                 }
 
                 new Thread(() =>

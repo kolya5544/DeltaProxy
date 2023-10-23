@@ -321,6 +321,7 @@ namespace DeltaProxy
         }
         public static void ShutdownDeltaProxy()
         {
+            if (serverActiveToken.IsCancellationRequested) Environment.Exit(0);
             serverActiveToken.Cancel();
             Log($"Terminating DeltaProxy... Disconnecting all clients.");
             lock (allConnections) allConnections.Where((z) => z.Client is not null).ToList().ForEach((z) =>

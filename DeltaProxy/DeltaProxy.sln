@@ -29,7 +29,9 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "IdentdModule", "..\modules\
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FakeWhoNamesWhoisModule", "..\modules\FakeWhoNamesWhoisModule\FakeWhoNamesWhoisModule.csproj", "{E96931CF-9D93-4C9A-8CF4-81D737B384AD}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AnopeModule", "..\modules\AnopeModule\AnopeModule.csproj", "{98459E61-069B-4E3D-BD8F-A0E407F78406}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AnopeModule", "..\modules\AnopeModule\AnopeModule.csproj", "{98459E61-069B-4E3D-BD8F-A0E407F78406}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AnonymousChannelModule", "..\modules\AnonymousChannelModule\AnonymousChannelModule.csproj", "{862335FB-0A48-4A46-AE58-05697BCFCAAD}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -93,6 +95,10 @@ Global
 		{98459E61-069B-4E3D-BD8F-A0E407F78406}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{98459E61-069B-4E3D-BD8F-A0E407F78406}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{98459E61-069B-4E3D-BD8F-A0E407F78406}.Release|Any CPU.Build.0 = Release|Any CPU
+		{862335FB-0A48-4A46-AE58-05697BCFCAAD}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{862335FB-0A48-4A46-AE58-05697BCFCAAD}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{862335FB-0A48-4A46-AE58-05697BCFCAAD}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{862335FB-0A48-4A46-AE58-05697BCFCAAD}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
