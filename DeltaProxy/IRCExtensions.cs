@@ -61,12 +61,17 @@ namespace DeltaProxy
 
         public static string Join(this string[] arr, int start, char delim = ' ', int length = -1)
         {
+            return arr.JoinStr(start, delim.ToString(), length);
+        }
+
+        public static string JoinStr(this string[] arr, int start, string delim = " ", int length = -1)
+        {
             string res = "";
             for (int i = start; i < (length == -1 ? arr.Length : Math.Min(arr.Length, length)); i++)
             {
                 res += arr[i] + delim;
             }
-            return res.TrimEnd(delim);
+            return res.Substring(0, Math.Max(0, res.Length - delim.Length));
         }
 
         public static void SendPostClientMessage(this ConnectionInfo sw, string message)
@@ -113,6 +118,25 @@ namespace DeltaProxy
         public static bool HasChannel(this string joinSequence, string channel)
         {
             return joinSequence.Trim(':').Split(',').Any((z) => z == channel);
+        }
+
+        public static string PreserveMultiChannel(this string joinStr, string? remove = null)
+        {
+            if (remove is null) return joinStr;
+
+            // expect string of JOIN #a,#b,#c or JOIN #a
+            string[] joinSplet = joinStr.Split(" ");
+            if (joinSplet.Length < 2) return joinStr;
+            string channels = joinSplet[1];
+            List<string> chanList = channels.Split(',').ToList();
+
+            chanList.Remove(remove);
+
+            if (chanList.Count == 0) return "";
+
+            channels = chanList.ToArray().JoinStr(0, ",");
+
+            return $"JOIN {channels}{(joinSplet.Length > 1 ? $" {joinSplet.JoinStr(2, " ")}" : "")}";
         }
 
         public static void FlushClientQueueAsync(this ConnectionInfo sw)
