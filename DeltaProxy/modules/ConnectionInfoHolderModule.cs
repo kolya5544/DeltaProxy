@@ -141,6 +141,9 @@ namespace DeltaProxy.modules
                     // Send USER to server.
                     info.ServerWriter.WriteLine($"USER {info.Username} 0 * :{info.Realname}");
 
+                    // flush everything immediately
+                    info.ServerWriter.Flush();
+
                     info.WebAuthed = true;
 
                     return ModuleResponse.BLOCK_PASS;
