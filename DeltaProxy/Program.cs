@@ -159,7 +159,7 @@ namespace DeltaProxy
                 client_stream.ReadTimeout = defaultTimeout;
                 client_stream.WriteTimeout = defaultTimeout;
 
-                client_sw = new StreamWriter(client_stream); client_sw.NewLine = "\n"; client_sw.AutoFlush = true;
+                client_sw = new StreamWriter(client_stream); client_sw.NewLine = "\r\n"; client_sw.AutoFlush = true;
                 client_sr = new StreamReader(client_stream);
 
                 // initialize the connection to the server
@@ -190,7 +190,7 @@ namespace DeltaProxy
                 server_stream.ReadTimeout = authedTimeout;
                 server_stream.WriteTimeout = authedTimeout;
 
-                server_sw = new StreamWriter(server_stream); server_sw.NewLine = "\n"; server_sw.AutoFlush = true;
+                server_sw = new StreamWriter(server_stream); server_sw.NewLine = "\r\n"; server_sw.AutoFlush = true;
                 server_sr = new StreamReader(server_stream);
 
                 Exception? clientException = null;
