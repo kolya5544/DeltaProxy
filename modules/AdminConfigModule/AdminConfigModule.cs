@@ -27,7 +27,7 @@ namespace DeltaProxy.modules.AdminConfig
             // check if it's an admin command /admin
             if (msgSplit.Assert("ADMIN", 0))
             {
-                lock (StaffAuthModule.authedStaff) if (!StaffAuthModule.authedStaff.Contains(info)) { info.SendClientMessage("DeltaProxy", info.Nickname, $"Access denied."); return ModuleResponse.BLOCK_PASS; }
+                lock (StaffAuthModule.authedStaff) if (!StaffAuthModule.authedStaff.Contains(info)) { return ModuleResponse.PASS; }
 
                 AdminChoice ac;
                 lock (choices) ac = choices.FirstOrDefault((z) => z.Nickname == info.Nickname);
