@@ -265,7 +265,7 @@ namespace DeltaProxy
                     var moduleResponse = ModuleHandler.ProcessServerMessage(info, ref cmd);
 
                     sentCounter += 1;
-                    if (sentCounter >= 5)
+                    if (sentCounter >= 2)
                     {
                         client_stream.ReadTimeout = authedTimeout;
                         client_stream.WriteTimeout = authedTimeout;
